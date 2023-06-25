@@ -8,6 +8,8 @@ STACK1  EQU     5FDFH+OFFSET    ;STACK DURING INTERRUPT
 STACK2  EQU     5FBFH+OFFSET    ;STACK DURING CONOUT; DISK ROUTINES
 STACK3  EQU     5F9FH+OFFSET
 DIRBUF  EQU     5E80H+OFFSET    ;128 BYTES FOR DISK DIRECTORY
+XXXBUF  EQU     5F00H+OFFSET    ;128 BYTES FOR ?
+YYYBUF  EQU     5F80H+OFFSET    ;128 BYTES FOR ?
  ;DISK    EQU     500FH+OFFSET
  ;INIT    EQU     5006H+OFFSET
  ;CRTIN   EQU     5009H+OFFSET
@@ -48,8 +50,8 @@ LPF     EQU      24             ;NO. OF ROWS ON CRT
         ORG     PVBIOS
 ;;;
 W007:   dw      3745h           ;e400
-CONSTK: dw      3545h           ;e402
-W008:   dw      4443h           ;e404
+CONSTK: dw      3545h           ;Save SP during console routines
+DSKSTK: dw      4443h           ;Save SP during disk routines
 INIT:   jmp     INIT1           ;e406
 CRTIN:  jmp     CRTIN1          ;e409
 CRTOUT: jmp     CRTOU1          ;e40c
@@ -105,10 +107,10 @@ B003:   DB      41h     ;e452 41
 B004:   DB      31h     ;e453 31
 B007:   DB      32h     ;e454 32
 B008:   DB      43h     ;e455 43
-W006:   DW      3134h   ;e456 3134h
+INTSTK: DW      3134h   ;Save SP during interrupts
         db      0,0     ;e458 00 00           lxi sp, 0000h
         db      0       ;e45a 00                 nop
-        db      0       ;e45b 00                 nop
+KBDCHR: db      0       ;replaces kbchar in os3bdos
         db      43h     ;e45c 43                 mov b, e
 B005:   DB      0       ;e45d 00
         db      0       ;e45e 00                 nop
@@ -143,7 +145,7 @@ L002:   mov     m, a            ; Clear byte in W001
         sta     B001
         sta     B003
         sta     B005
-        lxi     h, 0F300h       ; What buffer is this?
+        lxi     h, XXXBUF       ; What buffer is this?
         shld    W003
         shld    W004
                                 ; N.B D = 0 - so start of screen
@@ -191,8 +193,8 @@ L005:   BIT     7,A
 L006:   out     MNSTAT
         ret
 ;
-INTRP:  SSPD    W006
-        lxi     sp, 0F3DFh
+INTRP:  SSPD    INTSTK
+        lxi     sp, STACK1
         push    h
         push    d
         push    b
@@ -208,7 +210,7 @@ LX00:   in      INTRST
         pop     b
         pop     d
         pop     h
-        LSPD    W006
+        LSPD    INTSTK
         ei
         RETI
 ;
@@ -223,7 +225,7 @@ L004:   call    L012            ;e51e
         lxi     b, 0018h
         LDIR
         lxi     h, W001
-        shld    0e419h
+        shld    W012
         call    L025
         call    L027
         lda     0e44dh
@@ -322,9 +324,9 @@ L019:   call    L021            ;e5de
         mvi     a, 28h
         sta     0e44eh
         xra     a
-        sta     0e45bh
+        sta     KBDCHR
         sta     B005
-        lxi     h, 0f300h
+        lxi     h, XXXBUF
         shld    W003
         shld    W004
         ret
@@ -341,25 +343,25 @@ L022:   lda     B005            ;e5ff
         inr     a
         sta     B005
         lhld    W003
-        lxi     d, 0f380h
+        lxi     d, YYYBUF
         mov     a, l
         cmp     e
         JRNZ    L023
         mov     a, h
         cmp     d
         JRNZ    L023
-        lxi     h, 0f300h
+        lxi     h, XXXBUF
 L023:   mov     m, b            ;e61b
         inx     h
         shld    W003
         ret
 ;
-L024:   jmp     0e858h           ;e621
+L024:   jmp     L058           ;e621
 ;;; L001[INIT1]
-L025:   lhld    0e419h           ;e624
+L025:   lhld    W012           ;e624
         mov     a, m
         inx     h
-        shld    0e419h
+        shld    W012
         ora     a
         JRZ     L026
         mvi     a, 02h
@@ -452,14 +454,14 @@ L038:   lxi     h, B005 ;e6bf
         dcr     m
         ei
         lhld    W004
-        lxi     d, 0f380h
+        lxi     d, YYYBUF
         mov     a, l
         cmp     e
         JRNZ    L039
         mov     a, h
         cmp     d
         JRNZ    L039
-        lxi     h, 0f300h
+        lxi     h, XXXBUF
 L039:   mov     a, m
         inx     h
         shld    W004
@@ -967,8 +969,8 @@ LX01:   inx     h
         ret
 ;
 DISK1:  shld    0e458h           ;ea72
-        SSPD    W008
-        lxi     sp, 0f39fh      ;Is it lxi??
+        SSPD    DSKSTK
+        lxi     sp, STACK3
         mov     a, b
         cpi     00h
         JRZ     L104
@@ -986,7 +988,7 @@ DISK1:  shld    0e458h           ;ea72
 L104:   call    L110            ;ea94
         call    L108
         call    L113
-L106:   LSPD    W008
+L106:   LSPD    DSKSTK
         ret
 L103:   push    h               ;eaa2
         call    L110
@@ -1138,9 +1140,9 @@ L126:   call    L127            ;eb95
 ;;;
 L127:   mvi     a, 0ah          ;eba1
         out     PPICW
-        in      PPIB
+L129    in      PPIB
         ral
-        jc      0eba5h
+        jc      L129
         mvi     a, 08h
         out     PPICW
         ret
