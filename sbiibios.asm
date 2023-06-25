@@ -191,7 +191,8 @@ L001:   lxi     h, CONFIG
 L005:   BIT     7,A
         ;dw      7FCBh   ;BIT 7,A ; Set up sync byte
         lda     SYNC
-        dw      0228h   ;JR Z, L006
+        JRZ     L006
+        ;dw      0228h   ;JR Z, L006
         out     MNSTAT
 L006:   out     MNSTAT
         ret
@@ -240,15 +241,18 @@ L004:   call    L012            ;e51e
         lda     0e44dh
         dcr     a
         sta     0e44dh
-        dw      0420h           ;JR NZ, L010
+        JRNZ    L010
+        ;dw      0420h           ;JR NZ, L010
         mvi     a, 0Ch
         out     PPICW
 L010:   lda     0e45ch
         ora     a
-        dw      0D28h           ;JR Z, L011
+        JRZ     L011
+        ;dw      0D28h           ;JR Z, L011
         dcr     a
         sta     0e45ch
-        dw      0720h           ;JR NZ, L011
+        JRNZ    L011
+        ;dw      0720h           ;JR NZ, L011
         lda     0ef02h
         ani     0f7h
         out     MNSTAT
@@ -283,7 +287,8 @@ L012:   lhld    0e465h           ;e55c
 L013:   in      PPIB           ;e587
         mov     c, a
         ani     02h             ; Any key down
-        dw      4A28h           ;JR Z, L018
+        JRZ     L018
+        ;dw      4A28h           ;JR Z, L018
         mov     a, c
         ani     01h             ; New keyboard character
         JRZ     L016
@@ -509,8 +514,8 @@ L039:   mov     a, m
         lxi     b, 0012h
         CCDR                    ;aka CPDR
         ;dw      0B9EDh          ;CPDR
-        ;JRNZ    L040
-        dw      0920h           ;JR NZ, L040
+        JRNZ    L040
+        ;dw      0920h           ;JR NZ, L040
         lxi     h, 0ef0eh
         dad     b               ;??? Is it b (lost its argument)
         mov     a, m
@@ -552,11 +557,12 @@ CRTOU1: mov     b, c            ;1f84+offset
         jnz     L075
         lda     B003
         ora     a
-        dw      0620h           ;JR NZ, L042
+        JRNZ    LX02
+        ;dw      0620h           ;JR NZ, L042
         mov a, b
 L042:   sui     20h             ;e719
         jm      L055
-        mov     a, b
+LX02:   mov     a, b
         call    L043
         ret
 ;
@@ -573,7 +579,8 @@ L043:   ani     7fh             ;e723
         lda     0e44fh
         ora     a
         lda     0e418h
-        dw      0228h           ;JR Z, L044
+        JRZ     L044
+        ;dw      0228h           ;JR Z, L044
         ori     80h
 L044:   mov     m, a    ;e742
         di
@@ -693,7 +700,8 @@ L054:   mov     a, h
         mov     h, a
         mvi     m, 00h          ; Clear to zero
         inx     h
-        dw      0F510h          ;DJNZ L054
+        DJNZ    L054
+        ;dw      0F510h          ;DJNZ L054
         di
         lda     PRTA
         ori     20h             ; PRTA = xx1xxxxx - set bit 6
@@ -704,21 +712,29 @@ L054:   mov     a, h
 ;
 L055:   mov     a, b    ;e80c
         cpi     01h
-        dw      3128h           ;JR Z, L056
+        JRZ     L056
+        ;dw      3128h           ;JR Z, L056
         cpi     02h
-        dw      3a28h           ;JR Z, L057
+        JRZ     L057
+        ;dw      3a28h           ;JR Z, L057
         cpi     07h
-        dw      3f28h           ;JR Z, L058
+        JRZ     L058
+        ;dw      3f28h           ;JR Z, L058
         cpi     09h
-        dw      4528h           ;JR Z, L059
+        JRZ     L059
+        ;dw      4528h           ;JR Z, L059
         cpi     0dh
-        dw      4a28h           ;JR Z, L060
+        JRZ     L060
+        ;dw      4a28h           ;JR Z, L060
         cpi     14h
-        dw      5228h           ;JR Z, L061
+        JRZ     L061
+        ;dw      5228h           ;JR Z, L061
         cpi     0bh
-        dw      6028h           ;JR Z, L062
+        JRZ     L062
+        ;dw      6028h           ;JR Z, L062
         cpi     06h
-        dw      7028h           ;JR Z, L063
+        JRZ     L063
+        ;dw      7028h           ;JR Z, L063
         cpi     0ah
         jz      L064
         cpi     0ch
@@ -748,7 +764,8 @@ L058:   mvi     a, 0dh
 L059:   call    L063
         mov     a, l
         ani     07h
-        dw      0F820h          ;JR NZ, L059
+        JRNZ    L059
+        ;dw      0F820h          ;JR NZ, L059
         ret
 L060:   call    L049
         shld    0e412h
@@ -783,15 +800,19 @@ L063:   lhld    0e412h           ;e89d
         inr     l
         mov     a, l
         cpi     50h
-        dw      0f20h           ;JR NZ, L067
+        JRNZ    L067
+        ;dw      0f20h           ;JR NZ, L067
         mvi     l, 00h
         mov     a, h
         cpi     17h
-        dw      0720h           ;JR NZ, L068
+        JRNZ    L068
+        ;dw      0720h           ;JR NZ, L068
         push    h
         call    L046
         pop     h
-        dw      0118h           ;JR L067
+        JR      L067
+        ;dw      0118h           ;JR L067
+;
 L068:   inr     h
 L067:   shld    W007
         ret
@@ -801,7 +822,8 @@ L064:   lhld    0e412h   ;e8c0 2a
         shld    0e412h
         lda     0e401h
         cpi     17h
-        dw      0420h           ;JR NZ, L069
+        JRNZ    L069
+        ;dw      0420h           ;JR NZ, L069
         call    L046
         ret
 L069:   inr     a
@@ -812,7 +834,8 @@ L065:   lxi     h, W002 ;e8da
         xra     a
 L070:   mov     m, a
         inx     h
-        dw      0FC10h          ;DJNZ L070
+        DJNZ    L070
+        ;dw      0FC10h          ;DJNZ L070
         call    L073
         lxi     h, 0000h
         mvi     b, 50h
@@ -826,10 +849,13 @@ L066:   lhld    W007
         rz
         mov     a, l
         ora     a
-        dw      0520h           ;JR NZ, L071
+        JRNZ    L071
+        ;dw      0520h           ;JR NZ, L071
         mvi     l, 4fh
         dcr     h
-        dw      0118h           ;JR L072
+        JR      L072
+        ;dw      0118h           ;JR L072
+;
 L071:   dcr     l
 L072:   shld    W007
         lhld    0e412h
@@ -853,22 +879,28 @@ L074:   mvi     a, 01h  ;e927
 ;
 L075:   lda     B001    ;e92d
         cpi     01h
-        dw      0d28h           ;JR Z, L076
+        JRZ     L076
+        ;dw      0d28h           ;JR Z, L076
         cpi     02h
-        dw      2c28h           ;JR Z, L077
+        JRZ     L077
+        ;dw      2c28h           ;JR Z, L077
         cpi     03h
-        dw      4428h           ;JR Z, L078
+        JRZ     L078
+        ;dw      4428h           ;JR Z, L078
         xra     a
         sta     B001
         ret
 ;
 L076:   mov     a, b    ;e941
         cpi     59h
-        dw      0d28h           ;JR Z, L079
+        JRZ     L079
+        ;dw      0d28h           ;JR Z, L079
         cpi     3dh
-        dw      0928h           ;JR Z, L079
+        JRZ     L079
+        ;dw      0928h           ;JR Z, L079
         cpi     7eh
-        dw      0f28h           ;JR Z, L080
+        JRZ     L080
+        ;dw      0f28h           ;JR Z, L080
 L083:   xra     a               ;e94eh
         sta     B001
         ret
@@ -880,10 +912,13 @@ L081:   mvi     a, 02h
         ret
 L080:   mvi     a, 0ffh  ;e95d
         sta     0e451h
-        dw      0f318h          ;JR L081
+        JR      L081
+        ;dw      0f318h          ;JR L081
+;       
 L077:   lda     0e451h   ;e964
         ora     a
-        dw      3e20h           ;JR NZ, L082
+        JRNZ    L082
+        ;dw      3e20h           ;JR NZ, L082
         mov     a, b
         sui     20h
         mov     c, a
@@ -914,67 +949,94 @@ L078:   mov     a, b    ;e980
         dad     d
         shld    0e412h
         ret
-L082:   xra a           ;e9a8
+L082:   xra     a           ;e9a8
         sta     B001
         mov     a, b
         lxi     h, 0e45ah
         cpi     52h
-        dw      5228h           ;JR Z, L084
+        JRZ     L084
+        ;dw      5228h           ;JR Z, L084
         cpi     72h
-        dw      5128h           ;JR Z, L085
+        JRZ     L085
+        ;dw      5128h           ;JR Z, L085
         cpi     48h
-        dw      5028h           ;JR Z, L086
+        JRZ     L086
+        ;dw      5028h           ;JR Z, L086
         cpi     68h
-        dw      4f28h           ;JR Z, L087
+        JRZ     L087
+        ;dw      4f28h           ;JR Z, L087
         cpi     42h
-        dw      4e28h           ;JR Z, L088
+        JRZ     L088
+        ;dw      4e28h           ;JR Z, L088
         cpi     62h
-        dw      4d28h           ;JR Z, L089
+        JRZ     L089
+        ;dw      4d28h           ;JR Z, L089
         cpi     4eh
-        dw      5228h           ;JR Z, L092
+        JRZ     L092
+        ;dw      5228h           ;JR Z, L092
         cpi     55h
-        dw      4828h           ;JR Z, L090
+        JRZ     L090
+        ;dw      4828h           ;JR Z, L090
         cpi     75h
-        dw      4728h           ;JR Z, L091
+        JRZ     L091
+        ;dw      4728h           ;JR Z, L091
         lxi     h, 0e44fh
         cpi     73h
-        dw      4828h           ;JR Z, L093
+        JRZ     L093
+        ;dw      4828h           ;JR Z, L093
         cpi     53h
-        dw      4728h           ;JR Z, L094
+        JRZ     L094
+        ;dw      4728h           ;JR Z, L094
         lxi     h, PRTA
         cpi     67h
-        dw      4328h           ;JR Z, L095
+        JRZ     L095
+        ;dw      4328h           ;JR Z, L095
         cpi     47h
-        dw      4528h           ;JR Z, L096
+        JRZ     L096
+        ;dw      4528h           ;JR Z, L096
         cpi     41h
-        dw      4728h           ;JR Z, L097
+        JRZ     L097
+        ;dw      4728h           ;JR Z, L097
         cpi     61h
-        dw      4928h           ;JR Z, L098
+        JRZ     L098
+        ;dw      4928h           ;JR Z, L098
         lxi     h, B003
         cpi     45h
-        dw      4828h           ;JR Z, L099
+        JRZ     L099
+        ;dw      4828h           ;JR Z, L099
         cpi     44h
-        dw      4728h           ;JR Z, L100
+        JRZ     L100
+        ;dw      4728h           ;JR Z, L100
         cpi     4bh
-        dw      4628h           ;JR Z, L101
+        JRZ     L101
+        ;dw      4628h           ;JR Z, L101
         cpi     6bh
-        dw      5528h           ;JR Z, L102
+        JRZ     L102
+        ;dw      5528h           ;JR Z, L102
         ret
-L084:   dw      0C6CBh   ;SET 0, (HL)   ;ea06
+L084:   SETB    0, M
+        ;dw      0C6CBh   ;SET 0, (HL)   ;ea06
         ret
-L085:   dw      086CBh   ;RES 0, (HL)   ;ea09
+L085:   RES     0, M
+        ;dw      086CBh   ;RES 0, (HL)   ;ea09
         ret
-L086:   dw      0CECBh   ;SET 1, (HL)   ;ea0c
+L086:   SETB    1, M
+        ;dw      0CECBh   ;SET 1, (HL)   ;ea0c
         ret
-L087:   dw      08ECBh   ;RES 1, (HL)   ;ea0f
+L087:   RES     1, M
+        ;dw      08ECBh   ;RES 1, (HL)   ;ea0f
         ret
-L088:   dw      0D6CBh   ;SET 2, (HL)   ;ea12
+L088:   SETB    2, M
+        ;dw      0D6CBh   ;SET 2, (HL)   ;ea12
         ret
-L089:   dw      096CBh   ;RES 2, (HL)   ;ea15
+L089:   RES     2, M
+        ;dw      096CBh   ;RES 2, (HL)   ;ea15
         ret
-L090:   dw      0DECBh   ;SET 3, (HL)   ;ea18
+L090:   SETB    3, M
+        ;dw      0DECBh   ;SET 3, (HL)   ;ea18
         ret
-L091:   dw      09ECBh   ;RES 3, (HL)   ;ea1b
+L091:   RES     3, M
+        ;dw      09ECBh   ;RES 3, (HL)   ;ea1b
         ret
 L092:   xra     a                       ;ea1e
         sta     0e45ah
@@ -983,19 +1045,23 @@ L093:   mvi     m, 00h                  ;ea23
         ret
 L094:   mvi     m, 0ffh                  ;ea26
         ret
-L095:   dw      0C6CBh   ;SET 0, (HL)   ;ea29
+L095:   SETB    0, M
+        ;dw      0C6CBh   ;SET 0, (HL)   ;ea29
         mov     a, m
         out     PPIA
         ret
-L096:   dw      086CBh   ;RES 0, (HL)   ;ea2f
+L096:   RES     0, M
+        ;dw      086CBh   ;RES 0, (HL)   ;ea2f
         mov     a, m
         out     68h
         ret
-L097:   dw      0BECBh   ;RES 7, (HL)   ;ea35
+L097:   RES     7, M
+        ;dw      0BECBh   ;RES 7, (HL)   ;ea35
         mov     a, m
         out     68h
         ret
-L098:   dw      0FECBh   ;SET 7, (HL)   ;ea3b
+L098:   SETB    7, M
+        ;dw      0FECBh   ;SET 7, (HL)   ;ea3b
         mov     a, m
         out     68h
         ret
@@ -1025,24 +1091,30 @@ L102:   call    L101            ;ea5a
         sub     b
         mov     c, a
         xra     a
-        inx     h
+LX01:   inx     h
         mov     m, a
         dcr     c
-        dw      0FB20h          ;JR Z, L103
+        JRNZ    LX01
+        ;dw      0FB20h          ;JR Z, L103
         ret
 ;
 DISK1:  shld    0e458h           ;ea72
-        dw      73EDh, 0E404h   ;LD ($E404), SP
+        SSPD    W008
+        ;dw      73EDh, 0E404h   ;LD ($E404), SP
         lxi     sp, 0f39fh      ;Is it lxi??
         mov     a, b
         cpi     00h
-        dw      1328h           ;JR Z, L104
+        JRZ     L104
+        ;dw      1328h           ;JR Z, L104
         cpi     04h
-        dw      0F28h           ;JR Z, L104
+        JRZ     L104
+        ;dw      0F28h           ;JR Z, L104
         cpi     05h
-        dw      2928h           ;JR Z, L105
+        JRZ     L105
+        ;dw      2928h           ;JR Z, L105
         cpi     01h
-        dw      1528h           ;JR Z, L103
+        JRZ     L103
+        ;dw      1528h           ;JR Z, L103
         push    d
         push    b
         call    L111
@@ -1051,7 +1123,8 @@ DISK1:  shld    0e458h           ;ea72
 L104:   call    L110            ;ea94
         call    L108
         call    L113
-L106:   dw      7BEDh, 0E404h   ;LD SP, ($E404) ;ea9d
+L106:   LSPD    W008
+        ;dw      7BEDh, 0E404h   ;LD SP, ($E404) ;ea9d
         ret
 L103:   push    h               ;eaa2
         call    L110
@@ -1059,22 +1132,29 @@ L103:   push    h               ;eaa2
         pop     h
         call    L112
         call    L113
-        dw      0EB18h          ;JR $231D
+        JR      L106   
+        ;dw      0EB18h          ;JR $231D
+;
 L105:   call    L110            ;eab2
         mvi     b, 80h
 L107:   push    h               ;eab7
         pop     h
         dcr     b
-        dw      0FB20h           ;JR NZ, L107
+        JRNZ    L107
+        ;dw      0FB20h           ;JR NZ, L107
         xra     a
-        dw      0DE18h          ;JR L106
+        JR      L106
+        ;dw      0DE18h          ;JR L106
 ;
 L108:   in      PPIB           ;eabf
         ani     20h
-        dw      0FA28h          ;JR Z, L108
+        JRZ     L108
+        ;dw      0FA28h          ;JR Z, L108
+;
 L109:   in      PPIB           ;eac5
         ani     20h
-        dw      0FA20h           ;JR NZ, L109
+        JRNZ    L109
+        ;dw      0FA20h           ;JR NZ, L109
         ret
 ;
 L110:   call    L114            ;eacc
@@ -1099,7 +1179,8 @@ L111:   lxi     h, 0f600h        ;eae6
         call    L114
         lxi     d, 8808h
         lxi     b, 0200h
-        dw      0B0EDh          ;LDIR
+        LDIR
+        ;dw      0B0EDh          ;LDIR
         call    L116
         ret
 ;
@@ -1107,7 +1188,8 @@ L112:   call    L114            ;eaf8
         lxi     d, 0f600h
         lxi     h, 8808h
         lxi     b, 0200h
-        dw      0B0EDh          ;LDIR
+        LDIR
+        ;dw      0B0EDh          ;LDIR
         call    L116
         ret
 ;
@@ -1122,7 +1204,8 @@ L114:   mvi     a, 0ah          ;eb16
         out     PPICW
 L115:   in      PPIB
         ral
-        dw      0FB38h          ;JR C, L115
+        JRC     L115
+        ;dw      0FB38h          ;JR C, L115
         mvi     a, 08h
         out     PPICW
 L120:   ret
@@ -1180,7 +1263,8 @@ L124:   lxi     h, 0f600h        ;eb71
         call    L127
         lxi     d, 8808h
         lxi     b, 0200h
-        dw      0B0EDh          ;LDIR
+        LDIR
+        ;dw      0B0EDh          ;LDIR
         call    L128
         ret
 ;;;
@@ -1188,7 +1272,8 @@ L125:   call    L127            ;eb83
         lxi     d, 0f600h
         lxi     h, 8808h
         lxi     b, 0200h
-        dw      0B0EDh          ;LDIR
+        LDIR
+        ;dw      0B0EDh          ;LDIR
         call    L128
         ret
 ;;;
