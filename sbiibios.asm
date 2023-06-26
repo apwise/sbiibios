@@ -19,10 +19,20 @@ KBBUFF  EQU     505BH+OFFSET    ;CCP'S KEYBOARD BUFFER
 BUFCNT  EQU     505DH+OFFSET    ;TYPE-AHEAD BUFFER COUNT
 PVBIOS: EQU     5000H+OFFSET    ;START OF PRIVATE BIOS MODULE
 CONFIG  EQU     5B00H+OFFSET    ;Configuration table read from disk
+MNCMD   EQU     CONFIG+2        ;MAIN PORT COMMAND BYTE
 PRTA    EQU     CONFIG+5        ;Port A current value (initial value on disk)
+TIMENB  EQU     CONFIG+8        ;00 = TIME FUNCTION DISABLED; FF = TIME ENABLED
 SYNC    EQU     CONFIG+9        ;Sync byte
+HDSHAK  EQU     CONFIG+10       ;Handshake byte
+KEYPAD  EQU     CONFIG+14       ;
 TIME    EQU     0042H           ;TIME ( IN ASCII )
 DATE    EQU     004BH           ;DATE ( BCD )
+;
+FPYYYY  EQU     8802h
+FPYZZZ  EQU     8807h
+FPYBUF  EQU     8808h
+FPYXXX  EQU     8a0bh
+PHYSEC  EQU     0200h   
 ;
 ;TABLE OF EQUATES--I/O DEVICES
 ;
@@ -41,7 +51,7 @@ TOPSEL  EQU     02H             ;CRTC TOP OF PAGE REGISTER
 ROWSTR  EQU     01H             ;CRTC ROW START REGISTER
 CURSOR  EQU     03H             ;CRTC CURSOR REGISTER
 BELTIM  EQU     15              ;BELL TIME LOOP
-KEYDLY  EQU     40              ;KEY DELAY BEFRE REPEAT
+KEYDLY  EQU     40              ;KEY DELAY BEFORE REPEAT
 RPTTIM  EQU      1              ;KEY REPEAT TIME LOOP
 BRKTIM  EQU      15             ;250 MILLISEC BREAK TIME FOR COMM PORT
 LPF     EQU      24             ;NO. OF ROWS ON CRT
@@ -50,6 +60,7 @@ LPF     EQU      24             ;NO. OF ROWS ON CRT
         ORG     PVBIOS
 ;;;
 W007:   dw      3745h           ;e400
+W007H   EQU     W007+1
 CONSTK: dw      3545h           ;Save SP during console routines
 DSKSTK: dw      4443h           ;Save SP during disk routines
 INIT:   jmp     INIT1           ;e406
@@ -61,65 +72,34 @@ W010:   dw      0000h           ;e414
 W011:   dw      0000h           ;e416
 B009:   db      00h             ;e418
 W012:   dw      0000h           ;e419
-W001:   dw      3339h           ;e41b
-        db      45h       ;e41d 45                 mov b, l
-        db      30h       ;e41e 30                 nop
-        db      41h       ;e41f 41                 mov b, c
-        db      0dh       ;e420 0d                 dcr c
-        db      0ah       ;e421 0a                 ldax b
-        db      3ah, 31h, 38h ;e422 3a 31 38           lda 3831h
-        db      45h       ;e425 45                 mov b, l
-        db      37h       ;e426 37                 stc
-        db      31h, 35h, 30h ;e427 31 35 30           lxi sp, 3035h
-        db      30h       ;e42a 30                 nop
-        db      30h       ;e42b 30                 nop
-        db      44h       ;e42c 44                 mov b, h
-        db      44h       ;e42d 44                 mov b, h
-        db      33h       ;e42e 33                 inx sp
-        db      36h, 42h    ;e42f 36 42              mvi m, 42h
-        db      33h       ;e431 33                 inx sp
-        db      45h       ;e432 45                 mov b, l
-        db      30h       ;e433 30                 nop
-W002:   dw      3346h           ;e434 46 ;e435 33
-        db      32h, 34h, 44h ;e436 32 34 44           sta 4434h
-        db      45h       ;e439 45                 mov b, l
-        db      34h       ;e43a 34                 inr m
-        db      43h       ;e43b 43                 mov b, e
-        db      39h       ;e43c 39                 dad sp
-        db      43h       ;e43d 43                 mov b, e
-        db      44h       ;e43e 44                 mov b, h
-        db      45h       ;e43f 45                 mov b, l
-        db      45h       ;e440 45                 mov b, l
-        db      45h       ;e441 45                 mov b, l
-        db      36h, 37h    ;e442 36 37              mvi m, 37h
-        db      44h       ;e444 44                 mov b, h
-        db      45h       ;e445 45                 mov b, l
-        db      36h, 30h    ;e446 36 30              mvi m, 30h
-        db      37h       ;e448 37                 stc
-        db      43h       ;e449 43                 mov b, e
-        db      32h, 31h, 45h ;e44a 32 31 45           sta 4531h
-        db      45h       ;e44d 45                 mov b, l
-        db      37h       ;e44e 37                 stc
-        db      00h       ;e44f 00                 nop
-B001:   DB      0       ;e450 00
-B002:   DB      32h     ;e451 32
-B003:   DB      41h     ;e452 41
-B004:   DB      31h     ;e453 31
-B007:   DB      32h     ;e454 32
-B008:   DB      43h     ;e455 43
-INTSTK: DW      3134h   ;Save SP during interrupts
-        db      0,0     ;e458 00 00           lxi sp, 0000h
-        db      0       ;e45a 00                 nop
-KBDCHR: db      0       ;replaces kbchar in os3bdos
-        db      43h     ;e45c 43                 mov b, e
-B005:   DB      0       ;e45d 00
-        db      0       ;e45e 00                 nop
-W003:   DW      0       ;e45f 00 ;e460 00
-W004:   DW      0       ;e461 00 ;e462 00
-        db      0       ;e463 00                 nop
-        db      0       ;e464 00                 nop
-        db      0       ;e465 00                 nop
-        db      0       ;e466 00                 nop
+W001:   db      39h, 33h, 45h, 30h, 41h, 0dh, 0ah, 3ah
+        db      31h, 38h, 45h, 37h, 31h, 35h, 30h, 30h
+        db      30h, 44h, 44h, 33h, 36h, 42h, 33h, 45h
+        db      30h
+W002:   db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
+        db      39h, 43h, 44h, 45h, 45h, 45h, 36h, 37h
+        db      44h, 45h, 36h, 30h, 37h, 43h, 32h, 31h
+        db      45h
+B010:   db      45h             ;e44d 45
+B011:   db      37h             ;e44e 37
+B012:   db      00h             ;e44f 00
+B001:   DB      0               ;e450 00
+B002:   DB      32h             ;e451 32
+B003:   DB      41h             ;e452 41
+B004:   DB      31h             ;e453 31
+B007:   DB      32h             ;e454 32
+B008:   DB      43h             ;e455 43
+INTSTK: DW      3134h           ;Save SP during interrupts
+W013:   dw      0               ;e458 00 00
+B013:   db      0               ;e45a 00
+KBDCHR: db      0               ;replaces kbchar in os3bdos
+B014:   db      43h             ;e45c 43
+B005:   DB      0               ;e45d 00
+B015:   db      0               ;e45e 00
+W003:   DW      0               ;e45f 00 00
+W004:   DW      0               ;e461 00 00
+W015:   dw      0               ;e463 00 00
+W016:   dw      0               ;e465 00 00
 INIT1:  di
         lda     PRTA            ; Initialize 50Hz/60Hz
         out     PPIA
@@ -228,30 +208,30 @@ L004:   call    L012            ;e51e
         shld    W012
         call    L025
         call    L027
-        lda     0e44dh
+        lda     B010
         dcr     a
-        sta     0e44dh
+        sta     B010
         JRNZ    L010
         mvi     a, 0Ch
         out     PPICW
-L010:   lda     0e45ch
+L010:   lda     B014
         ora     a
         JRZ     L011
         dcr     a
-        sta     0e45ch
+        sta     B014
         JRNZ    L011
-        lda     0ef02h
+        lda     MNCMD
         ani     0f7h
         out     MNSTAT
 L011:   call    L013
         ret
 ;
-L012:   lhld    0e465h           ;e55c
-        shld    0e463h
-        lhld    0e416h
-        shld    0e414h
+L012:   lhld    W016           ;e55c
+        shld    W015
+        lhld    W011
+        shld    W010
         xchg
-        lhld    0e412h
+        lhld    W009
         mov     a, h
         ani     0fh             ; Limit to 12-bit address
         mov     h, a
@@ -280,14 +260,14 @@ L013:   in      PPIB           ;e587
         JRZ     L016
         call    L021
         mvi     a, 28h
-L020:   sta     0e44eh
-        lda     0ef0ah
+L020:   sta     B011
+        lda     HDSHAK
         ora     a
         JRZ     L014
         mvi     a, 0dh
         out     PPICW
         mvi     a, 01h
-        sta     0e44dh
+        sta     B010
 L014:   in      KBCHAR
         mov     b, a
         cpi     0f1h
@@ -306,23 +286,23 @@ L014:   in      KBCHAR
 L015:   call    L022            ;e5c5
         ret
 ;
-L016:   lda     0e44eh           ;e5c9
+L016:   lda     B011           ;e5c9
         ora     a
         JRNZ    L017
         mvi     a, 01h
         JR      L020
 ;       
 L017:   dcr     a               ;e5d3
-        sta     0e44eh
+        sta     B011
         ret
 ;
 L018:   mvi     a, 0f0h          ;e5d8
-        sta     0e44eh
+        sta     B011
         ret
 ;
 L019:   call    L021            ;e5de
         mvi     a, 28h
-        sta     0e44eh
+        sta     B011
         xra     a
         sta     KBDCHR
         sta     B005
@@ -372,10 +352,10 @@ L026:   mvi     a, 03h          ;e634
         out     PPICW
         ret
 ;
-L027:   lda     0ef08h           ;e639
+L027:   lda     TIMENB           ;e639
         ora     a
         rz
-        lhld    0e463h
+        lhld    W015
         lxi     d, 0009h
         dad     d
         mvi     c, 32h          ; What port is this? RTC?
@@ -392,7 +372,7 @@ L028:   INP     A
         dcr     d
         jnz     L028
         xra     a
-        sta     0ef08h
+        sta     TIMENB
         ret
 ;
 L029:   ori     30h     ;e662
@@ -411,7 +391,7 @@ L030a:  inr     c                ;e66e
 CRTIN1: call    L038            ;e674
         mov     b, a
         BIT     7,A
-        cnz     0e6dch
+        cnz     LX03
         cpi     00h
         JRZ     L031
         cpi     81h
@@ -427,7 +407,7 @@ CRTIN1: call    L038            ;e674
         JRZ     L036
         JR      L037
 ;
-L031:   lxi     h, 0e45eh        ;e697
+L031:   lxi     h, B015        ;e697
         mov     a, m
         inr     a
         ani     01h
@@ -442,8 +422,8 @@ L033:   mvi     b, 06h  ;e6a9
 L035:   mvi     b, 0ah  ;e6ad
         JR      L037
 L036:   mvi     a, 0fh  ;e6b1
-        sta     0e45ch
-        lda     0ef02h
+        sta     B014
+        lda     MNCMD
         ori     08h
         out     MNSTAT
 L037:   mov     a, b    ;e6bd
@@ -467,12 +447,12 @@ L039:   mov     a, m
         shld    W004
         ret
 ;
-        push    b
-        lxi     h, 0e703h
+LX03:   push    b
+        lxi     h, B016
         lxi     b, 0012h
         CCDR                    ;aka CPDR
         JRNZ    L040
-        lxi     h, 0ef0eh
+        lxi     h, KEYPAD
         dad     b               ;??? Is it b (lost its argument)
         mov     a, m
         pop     b
@@ -484,7 +464,8 @@ L041:   ret
         db      08Dh, 0ACh, 0ADh, 0AEh
         db      0B0h, 0B1h, 0B2h, 0B3h
         db      0B4h, 0B5h, 0B6h, 0B7h
-        db      0B8h, 0B9h
+        db      0B8h
+B016:   db      0B9h            ;e703
 CRTOU1: mov     b, c            ;1f84+offset
         mov     a, c
         cpi     1bh
@@ -503,18 +484,18 @@ LX02:   mov     a, b
         ret
 ;
 L043:   ani     7fh             ;e723
-        sta     0e418h
+        sta     B009
         call    L045
         mov     a, m
         ora     a
         cz      L052
-        lhld    0e412h
+        lhld    W009
         mov     a, h
         ori     0f8h
         mov     h, a
-        lda     0e44fh
+        lda     B012
         ora     a
-        lda     0e418h
+        lda     B009
         JRZ     L044
         ori     80h
 L044:   mov     m, a    ;e742
@@ -523,14 +504,12 @@ L044:   mov     m, a    ;e742
         ani     0dfh
         out     PPIA
         EXAF
-        ;db      08h             ;EX       AF, AF'
         mov     a, h
         ani     4fh
         mov     h, a
-        lda     0e45ah
+        lda     B013
         mov     m, a
         EXAF
-        ;db      08h             ;EX       AF, AF'
         ori     20h
         out     PPIA
         ei
@@ -539,29 +518,29 @@ L044:   mov     m, a    ;e742
 ;;; CRTOU1
 L045:   lxi     h, W002         ;e75e
         mvi     d, 00h
-        lda     0e401h
+        lda     W007H
         mov     e, a
         dad     d
         ret
 ;
-L046:   lda     0e45eh               ;e769
+L046:   lda     B015               ;e769
         ora     a
         rnz
-        lda     0ef08h
+        lda     TIMENB
         ora     a
         JRZ     L048
-L047:   lda     0e455h   ;e774
+L047:   lda     B008   ;e774
         sui     15h
-        jp      0e774h
+        jp      L047
 L048:   di              ;e77c
-        lhld    0e416h
+        lhld    W011
         lxi     d, 0050h
         dad     d
-        shld    0e416h
-        lhld    0e465h
+        shld    W011
+        lhld    W016
         dad     d
-        shld    0e465h
-        lxi     h, 0e435h
+        shld    W016
+        lxi     h, W002+1
         lxi     d, W002
         lxi     b, 0017h
         LDIR
@@ -573,13 +552,13 @@ L048:   di              ;e77c
         ora     a
         rnz
         mvi     b, 50h          ; Line length
-        lhld    0e416h           ; e416 must store address in screen CPU2 RAM
+        lhld    W011           ; e416 must store address in screen CPU2 RAM
         call    L003            ; clear it (and in CPU2 RAM)
         lxi     h, W002
         mvi     m, 0ffh
         ret
 ;
-L049:   lda     0e401h           ;e7b0
+L049:   lda     W007H           ;e7b0
         lxi     h, 0000h
         lxi     d, 0050h
         mvi     b, 08h          ; 8 characters at the start of screen RAM?
@@ -665,10 +644,10 @@ L055:   mov     a, b    ;e80c
 ;
 L056:   lxi     h, 0000h
         shld    W007
-        lhld    0e416h
-        shld    0e412h
+        lhld    W011
+        shld    W009
         ret
-L057:   lxi     h, 0ef0ah
+L057:   lxi     h, HDSHAK
         mov     a, m
         inr     a
         ani     01h
@@ -677,7 +656,7 @@ L057:   lxi     h, 0ef0ah
 L058:   mvi     a, 0dh
         out     PPICW
         mvi     a, 0fh
-        sta     0e44dh
+        sta     B010
         ret
 L059:   call    L063
         mov     a, l
@@ -685,34 +664,34 @@ L059:   call    L063
         JRNZ    L059
         ret
 L060:   call    L049
-        shld    0e412h
+        shld    W009
         mvi     a, 00h
         sta     W007
         ret
-L061:   lxi     h, 0ef08h
+L061:   lxi     h, TIMENB
         mov     a, m
         inr     a
         ani     01h
         mov     m, a
         rnz
-        lhld    0e465h
+        lhld    W016
         mvi     b, 0bh
         call    L003
         ret
-L062:   lda     0e401h
+L062:   lda     W007H
         ora     a
         rz
         dcr     a
-        sta     0e401h
-        lhld    0e412h
+        sta     W007H
+        lhld    W009
         lxi     d, 0ffb0h
         dad     d
-        shld    0e412h
+        shld    W009
         ret
 ;;; CRTOUT
-L063:   lhld    0e412h           ;e89d
+L063:   lhld    W009           ;e89d
         inx     h
-        shld    0e412h
+        shld    W009
         lhld    W007
         inr     l
         mov     a, l
@@ -730,17 +709,17 @@ L063:   lhld    0e412h           ;e89d
 L068:   inr     h
 L067:   shld    W007
         ret
-L064:   lhld    0e412h   ;e8c0 2a
+L064:   lhld    W009   ;e8c0 2a
         lxi     d, 0050h
         dad     d
-        shld    0e412h
-        lda     0e401h
+        shld    W009
+        lda     w007H
         cpi     17h
         JRNZ    L069
         call    L046
         ret
 L069:   inr     a
-        sta     0e401h
+        sta     W007H
         ret
 L065:   lxi     h, W002 ;e8da
         mvi     b, 18h
@@ -768,19 +747,19 @@ L066:   lhld    W007
 ;
 L071:   dcr     l
 L072:   shld    W007
-        lhld    0e412h
+        lhld    W009
         dcx     h
-        shld    0e412h
+        shld    W009
         ret
 ;;; INIT1
 L073:   lxi     h,0000h  ;e910
         shld    W007
-        shld    0e414h
-        shld    0e416h
-        shld    0e412h
+        shld    W010
+        shld    W011
+        shld    W009
         lxi     d, 0045h
         dad     d
-        shld    0e465h
+        shld    W016
         ret
 ;
 L074:   mvi     a, 01h  ;e927
@@ -810,15 +789,15 @@ L083:   xra     a               ;e94eh
         ret
 ;
 L079:   xra     a       ;e953
-        sta     0e451h
+        sta     B002
 L081:   mvi     a, 02h
         sta     B001
         ret
 L080:   mvi     a, 0ffh  ;e95d
-        sta     0e451h
+        sta     B002
         JR      L081
 ;       
-L077:   lda     0e451h   ;e964
+L077:   lda     B002   ;e964
         ora     a
         JRNZ    L082
         mov     a, b
@@ -828,7 +807,7 @@ L077:   lda     0e451h   ;e964
         sui     18h
         jp      L083
         mov     a, c
-        sta     0e454h
+        sta     B007
         mvi     a, 03h
         sta     B001
         ret
@@ -839,22 +818,22 @@ L078:   mov     a, b    ;e980
         sui     70h
         jp      L083
         mov     a, c
-        sta     0e453h
+        sta     B004
         xra     a
         sta     B001
-        lhld    0e453h
+        lhld    B004
         shld    W007
         call    L049
         xchg
         lhld    W007
         mvi     h, 00h
         dad     d
-        shld    0e412h
+        shld    W009
         ret
 L082:   xra     a           ;e9a8
         sta     B001
         mov     a, b
-        lxi     h, 0e45ah
+        lxi     h, B013
         cpi     52h
         JRZ     L084
         cpi     72h
@@ -873,7 +852,7 @@ L082:   xra     a           ;e9a8
         JRZ     L090
         cpi     75h
         JRZ     L091
-        lxi     h, 0e44fh
+        lxi     h, B012
         cpi     73h
         JRZ     L093
         cpi     53h
@@ -914,7 +893,7 @@ L090:   SETB    3, M
 L091:   RES     3, M
         ret
 L092:   xra     a                       ;ea1e
-        sta     0e45ah
+        sta     B013
         ret
 L093:   mvi     m, 00h                  ;ea23
         ret
@@ -954,7 +933,7 @@ L101:   call    L049            ;ea47
 ;
 L102:   call    L101            ;ea5a
         call    L045
-        lda     0e401h
+        lda     W007H
         cpi     17h
         rz
         mov     b, a
@@ -967,8 +946,18 @@ LX01:   inx     h
         dcr     c
         JRNZ    LX01
         ret
-;
-DISK1:  shld    0e458h           ;ea72
+;;;
+;;; Enter with something in HL - pointer to data?
+;;; Something in b - seems to be
+;;;  1 - Read
+;;;  2 - Write with    RAW verification
+;;;  6 - Write without RAW verification
+;;;
+;;; c = disk   number
+;;; d = track  number
+;;; e = sector number
+;;; 
+DISK1:  shld    W013           ;ea72
         SSPD    DSKSTK
         lxi     sp, STACK3
         mov     a, b
@@ -1017,7 +1006,7 @@ L109:   in      PPIB           ;eac5
         ret
 ;
 L110:   call    L114            ;eacc
-        lxi     h, 8802h
+        lxi     h, FPYYYY
         mov     m, b
         inx     h
         mov     m, c
@@ -1030,11 +1019,11 @@ L110:   call    L114            ;eacc
         cma
         mov     m, a
         mvi     a, 0ffh
-        sta     8807h
+        sta     FPYZZZ
         call    L116
         ret
 ;
-L111:   lxi     h, 0f600h        ;eae6
+L111:   lxi     h, HSTBUF        ;eae6
         call    L114
         lxi     d, 8808h
         lxi     b, 0200h
@@ -1043,7 +1032,7 @@ L111:   lxi     h, 0f600h        ;eae6
         ret
 ;
 L112:   call    L114            ;eaf8
-        lxi     d, 0f600h
+        lxi     d, HSTBUF
         lxi     h, 8808h
         lxi     b, 0200h
         LDIR
@@ -1051,7 +1040,7 @@ L112:   call    L114            ;eaf8
         ret
 ;
 L113:   call    L114            ;eb0a
-        lda     8a0bh
+        lda     FPYXXX
         push    psw
         call    L116
         pop     psw
@@ -1098,7 +1087,7 @@ L122:   in      PPIB           ;eb4f
         ret
 ;
 L123:   call    L127            ;eb57
-        lxi     h, 8802h
+        lxi     h, FPYYYY
         mov     m, b
         inx     h
         mov     m, c
@@ -1111,28 +1100,28 @@ L123:   call    L127            ;eb57
         cma
         mov     m, a
         mvi     a, 0ffh
-        sta     8807h
+        sta     FPYZZZ
         call    L128
         ret
 ;;;
-L124:   lxi     h, 0f600h        ;eb71
+L124:   lxi     h, HSTBUF        ;eb71
         call    L127
-        lxi     d, 8808h
-        lxi     b, 0200h
+        lxi     d, FPYBUF
+        lxi     b, PHYSEC
         LDIR
         call    L128
         ret
 ;;;
 L125:   call    L127            ;eb83
-        lxi     d, 0f600h
-        lxi     h, 8808h
-        lxi     b, 0200h
+        lxi     d, HSTBUF
+        lxi     h, FPYBUF
+        lxi     b, PHYSEC
         LDIR
         call    L128
         ret
 ;;;
 L126:   call    L127            ;eb95
-        lda     8a0bh
+        lda     FPYXXX
         push    psw
         call    L128
         pop     psw
