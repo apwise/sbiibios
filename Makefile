@@ -55,14 +55,14 @@ sbiibios.rel: sbiibios.asm
 
 sbiibios.com: sbiibios.rel
 	cpm $(LINK) sbiibios.rel[L0000,Pe400]
-	mv sbiibios.com sbiibios.tmp && tail -c +58369 sbiibios.tmp | head -c 1977 > sbiibios.com
+	mv sbiibios.com sbiibios.tmp && tail -c +58369 sbiibios.tmp | head -c 1837 > sbiibios.com
 	rm -f sbiibios.tmp
 
 # && truncate --size=2816 sbiibios.com
 
 junk2: SBIIBOOT.dsk
-	tail -c +9274 $< | head -c 839 > $@
-#              0x2439+1          0x2780 - 0x2439
+	tail -c +9134 $< | head -c 979 > $@
+#              0x23ad+1          0x2780 - 0x23ad
 
 # config.com (from qd31bios) comes here
 

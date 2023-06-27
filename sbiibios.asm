@@ -28,11 +28,11 @@ KEYPAD  EQU     CONFIG+14       ;
 TIME    EQU     0042H           ;TIME ( IN ASCII )
 DATE    EQU     004BH           ;DATE ( BCD )
 ;
-FPYPRM  EQU     8802h
-FPYCMD  EQU     8807h
-FPYBUF  EQU     8808h
-FPYSTS  EQU     8a0bh
-PHYSEC  EQU     0200h   
+FPYPRM  EQU     8802h           ; 4-byte parameter block
+FPYCMD  EQU     8807h           ; Command byte (FF = "go")
+FPYBUF  EQU     8808h           ; 512-byte sector buffer
+FPYSTS  EQU     8a0bh           ; Returned status byte
+PHYSEC  EQU     0200h           ; Physical sector size (512 bytes)
 ;
 ;TABLE OF EQUATES--I/O DEVICES
 ;
@@ -1063,88 +1063,5 @@ buscls: mvi     a, 09h          ;PPIC[4] High
         mvi     a, 0bh
         out     PPICW           ;PPIC[5] High
         ret
-;;;
-;;; ****************************************************************
-;;; I think the following is junk that can't be reached?
-L117:   mov l, e                ;eb2d
-        ret
-;
-L118:   pop     h               ;eb2f
-        call    L125
-        call    L126
-        jmp     buso2
-        call    L123            ;Can this be reached?
-;;;
-        mvi     b, 80h
-L119:   push    h               ;eb3e
-        pop     h
-        dcr     b
-        jnz     L119
-        xra     a
-        jmp     buso2
-;
-L121:   in      PPIB           ;eb48
-        ani     20h
-        jz      L121
-L122:   in      PPIB           ;eb4f
-        ani     20h
-        jnz     L122
-        ret
-;
-L123:   call    L127            ;eb57
-        lxi     h, FPYPRM
-        mov     m, b
-        inx     h
-        mov     m, c
-        inx     h
-        mov     a, e
-        cma
-        mov     m, a
-        inx     h
-        mov     a, d
-        cma
-        mov     m, a
-        mvi     a, 0ffh
-        sta     FPYCMD
-        call    L128
-        ret
-;;;
-L124:   lxi     h, HSTBUF        ;eb71
-        call    L127
-        lxi     d, FPYBUF
-        lxi     b, PHYSEC
-        LDIR
-        call    L128
-        ret
-;;;
-L125:   call    L127            ;eb83
-        lxi     d, HSTBUF
-        lxi     h, FPYBUF
-        lxi     b, PHYSEC
-        LDIR
-        call    L128
-        ret
-;;;
-L126:   call    L127            ;eb95
-        lda     FPYSTS
-        push    psw
-        call    L128
-        pop     psw
-        ret
-;;;
-L127:   mvi     a, 0ah          ;eba1
-        out     PPICW
-L129    in      PPIB
-        ral
-        jc      L129
-        mvi     a, 08h
-        out     PPICW
-        ret
-;;;
-L128:   mvi     a, 09h          ;ebb0
-        out     PPICW
-        mvi     a, 0bh
-        out     PPICW
-        ret
-;;;
+; 
         end
