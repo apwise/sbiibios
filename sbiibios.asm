@@ -28,10 +28,10 @@ KEYPAD  EQU     CONFIG+14       ;
 TIME    EQU     0042H           ;TIME ( IN ASCII )
 DATE    EQU     004BH           ;DATE ( BCD )
 ;
-FPYYYY  EQU     8802h
-FPYZZZ  EQU     8807h
+FPYPRM  EQU     8802h
+FPYCMD  EQU     8807h
 FPYBUF  EQU     8808h
-FPYXXX  EQU     8a0bh
+FPYSTS  EQU     8a0bh
 PHYSEC  EQU     0200h   
 ;
 ;TABLE OF EQUATES--I/O DEVICES
@@ -90,7 +90,7 @@ B004:   DB      31h             ;e453 31
 B007:   DB      32h             ;e454 32
 B008:   DB      43h             ;e455 43
 INTSTK: DW      3134h           ;Save SP during interrupts
-W013:   dw      0               ;e458 00 00
+dskptr:   dw      0               ;e458 00 00
 B013:   db      0               ;e45a 00
 KBDCHR: db      0               ;replaces kbchar in os3bdos
 B014:   db      43h             ;e45c 43
@@ -949,125 +949,130 @@ LX01:   inx     h
 ;;;
 ;;; Enter with something in HL - pointer to data?
 ;;; Something in b - seems to be
+;;;  0,4 - Restore
 ;;;  1 - Read
 ;;;  2 - Write with    RAW verification
+;;;  5 - format
 ;;;  6 - Write without RAW verification
 ;;;
 ;;; c = disk   number
 ;;; d = track  number
 ;;; e = sector number
-;;; 
-DISK1:  shld    W013           ;ea72
+;;;
+DISK1:  shld    dskptr          ; Save data pointer (but this never used)
         SSPD    DSKSTK
         lxi     sp, STACK3
         mov     a, b
-        cpi     00h
-        JRZ     L104
-        cpi     04h
-        JRZ     L104
-        cpi     05h
-        JRZ     L105
-        cpi     01h
-        JRZ     L103
+        cpi     00h             ; Restore
+        JRZ     drestr
+        cpi     04h             ; Restore
+        JRZ     drestr
+        cpi     05h             ; Format
+        JRZ     dfrmt
+        cpi     01h             ; Read
+        JRZ     dread
+;;; Here for write
         push    d
         push    b
-        call    L111
+        call    hst2fp          ; Copy data to CPU2
         pop     b
         pop     d
-L104:   call    L110            ;ea94
-        call    L108
-        call    L113
-L106:   LSPD    DSKSTK
+drestr: call    fparam          ; Send parameters
+        call    fpwres          ; Wait for result
+        call    fpstat          ; Get status to return
+dexit:  LSPD    DSKSTK
         ret
-L103:   push    h               ;eaa2
-        call    L110
-        call    L108
-        pop     h
-        call    L112
-        call    L113
-        JR      L106   
+;;;
+dread:  push    h               ; Save data pointer (why is dskptr not used?)
+        call    fparam          ; Send parameters
+        call    fpwres          ; Wait for result
+        pop     h               ; Recover data pointer
+        call    fp2hst          ; Copy data from CPU2
+        call    fpstat          ; Get status to return
+        JR      dexit   
 ;
-L105:   call    L110            ;eab2
+dfrmt:  call    fparam          ; Send parameters  
         mvi     b, 80h
-L107:   push    h               ;eab7
+dfrmt1: push    h               ; Waste time for command to start
         pop     h
         dcr     b
-        JRNZ    L107
-        xra     a
-        JR      L106
+        JRNZ    dfrmt1
+        xra     a               ; Clear return status
+        JR      dexit
 ;
-L108:   in      PPIB           ;eabf
+fpwres: in      PPIB            ; Wait for FPY command to complete
         ani     20h
-        JRZ     L108
-;
-L109:   in      PPIB           ;eac5
+        JRZ     fpwres          ; Wait for PPIB[5] to go high
+fpwr2:  in      PPIB
         ani     20h
-        JRNZ    L109
+        JRNZ    fpwr2           ; Wait for PPIB[5] to go low
         ret
 ;
-L110:   call    L114            ;eacc
-        lxi     h, FPYYYY
-        mov     m, b
+fparam: call    busopn          ; Send params
+        lxi     h, FPYPRM
+        mov     m, b            ; Command byte
         inx     h
-        mov     m, c
+        mov     m, c            ; Disk number
         inx     h
         mov     a, e
         cma
-        mov     m, a
+        mov     m, a            ; ~sector number
         inx     h
         mov     a, d
         cma
-        mov     m, a
+        mov     m, a            ; ~track number
         mvi     a, 0ffh
-        sta     FPYZZZ
-        call    L116
+        sta     FPYCMD
+        call    buscls
         ret
 ;
-L111:   lxi     h, HSTBUF        ;eae6
-        call    L114
-        lxi     d, 8808h
-        lxi     b, 0200h
+hst2fp: lxi     h, HSTBUF        ;eae6
+        call    busopn
+        lxi     d, FPYBUF
+        lxi     b, PHYSEC
         LDIR
-        call    L116
+        call    buscls
         ret
 ;
-L112:   call    L114            ;eaf8
+fp2hst: call    busopn            ;eaf8
         lxi     d, HSTBUF
-        lxi     h, 8808h
-        lxi     b, 0200h
+        lxi     h, FPYBUF
+        lxi     b, PHYSEC
         LDIR
-        call    L116
+        call    buscls
         ret
 ;
-L113:   call    L114            ;eb0a
-        lda     FPYXXX
+fpstat: call    busopn            ;eb0a
+        lda     FPYSTS
         push    psw
-        call    L116
+        call    buscls
         pop     psw
         ret
 ;
-L114:   mvi     a, 0ah          ;eb16
+busopn: mvi     a, 0ah          ;PPIC[5] Low
         out     PPICW
-L115:   in      PPIB
-        ral
-        JRC     L115
-        mvi     a, 08h
+busbsy: in      PPIB            ; Wait for CPU2
+        ral                     ; not busy
+        JRC     busbsy
+        mvi     a, 08h          ;PPIC[4] Low
         out     PPICW
-L120:   ret
+buso2:  ret                     ;Label may not be required (junk below)
 ;
-L116:   mvi     a, 09h          ;eb24
+buscls: mvi     a, 09h          ;PPIC[4] High
         out     PPICW
         mvi     a, 0bh
-        out     PPICW
+        out     PPICW           ;PPIC[5] High
         ret
-;
+;;;
+;;; ****************************************************************
+;;; I think the following is junk that can't be reached?
 L117:   mov l, e                ;eb2d
         ret
 ;
 L118:   pop     h               ;eb2f
         call    L125
         call    L126
-        jmp     L120
+        jmp     buso2
         call    L123            ;Can this be reached?
 ;;;
         mvi     b, 80h
@@ -1076,7 +1081,7 @@ L119:   push    h               ;eb3e
         dcr     b
         jnz     L119
         xra     a
-        jmp     L120
+        jmp     buso2
 ;
 L121:   in      PPIB           ;eb48
         ani     20h
@@ -1087,7 +1092,7 @@ L122:   in      PPIB           ;eb4f
         ret
 ;
 L123:   call    L127            ;eb57
-        lxi     h, FPYYYY
+        lxi     h, FPYPRM
         mov     m, b
         inx     h
         mov     m, c
@@ -1100,7 +1105,7 @@ L123:   call    L127            ;eb57
         cma
         mov     m, a
         mvi     a, 0ffh
-        sta     FPYZZZ
+        sta     FPYCMD
         call    L128
         ret
 ;;;
@@ -1121,7 +1126,7 @@ L125:   call    L127            ;eb83
         ret
 ;;;
 L126:   call    L127            ;eb95
-        lda     FPYXXX
+        lda     FPYSTS
         push    psw
         call    L128
         pop     psw
