@@ -8,23 +8,16 @@ STACK1  EQU     5FDFH+OFFSET    ;STACK DURING INTERRUPT
 STACK2  EQU     5FBFH+OFFSET    ;STACK DURING CONOUT; DISK ROUTINES
 STACK3  EQU     5F9FH+OFFSET
 DIRBUF  EQU     5E80H+OFFSET    ;128 BYTES FOR DISK DIRECTORY
-XXXBUF  EQU     5F00H+OFFSET    ;128 BYTES FOR ?
-YYYBUF  EQU     5F80H+OFFSET    ;128 BYTES FOR ?
- ;DISK    EQU     500FH+OFFSET
- ;INIT    EQU     5006H+OFFSET
- ;CRTIN   EQU     5009H+OFFSET
- ;CRTOUT  EQU     500CH+OFFSET
- ;CONSTK  EQU     5002H+OFFSET
-KBBUFF  EQU     505BH+OFFSET    ;CCP'S KEYBOARD BUFFER
-BUFCNT  EQU     505DH+OFFSET    ;TYPE-AHEAD BUFFER COUNT
-PVBIOS: EQU     5000H+OFFSET    ;START OF PRIVATE BIOS MODULE
+KBDBUF  EQU     5F00H+OFFSET    ;128 BYTE KEYBOARD BUFFER
+KBDBFE  EQU     5F80H+OFFSET    ;END OF KEYBOARD BUFFER (BOTTOM OF STACK3)
 CONFIG  EQU     5B00H+OFFSET    ;Configuration table read from disk
 MNCMD   EQU     CONFIG+2        ;MAIN PORT COMMAND BYTE
 PRTA    EQU     CONFIG+5        ;Port A current value (initial value on disk)
 TIMENB  EQU     CONFIG+8        ;00 = TIME FUNCTION DISABLED; FF = TIME ENABLED
 SYNC    EQU     CONFIG+9        ;Sync byte
-HDSHAK  EQU     CONFIG+10       ;Handshake byte
+KEYCLK  EQU     CONFIG+10       ;Handshake byte
 KEYPAD  EQU     CONFIG+14       ;
+PVBIOS: EQU     5000H+OFFSET    ;START OF PRIVATE BIOS MODULE
 TIME    EQU     0042H           ;TIME ( IN ASCII )
 DATE    EQU     004BH           ;DATE ( BCD )
 ;
@@ -80,7 +73,7 @@ W002:   db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
         db      39h, 43h, 44h, 45h, 45h, 45h, 36h, 37h
         db      44h, 45h, 36h, 30h, 37h, 43h, 32h, 31h
         db      45h
-B010:   db      45h             ;e44d 45
+belctr:   db      45h             ;e44d 45
 B011:   db      37h             ;e44e 37
 B012:   db      00h             ;e44f 00
 B001:   DB      0               ;e450 00
@@ -88,16 +81,16 @@ B002:   DB      32h             ;e451 32
 B003:   DB      41h             ;e452 41
 B004:   DB      31h             ;e453 31
 B007:   DB      32h             ;e454 32
-B008:   DB      43h             ;e455 43
+vlinum:   DB      43h             ;e455 43
 INTSTK: DW      3134h           ;Save SP during interrupts
-dskptr:   dw      0               ;e458 00 00
+dskptr: dw      0               ;e458 00 00
 B013:   db      0               ;e45a 00
-KBDCHR: db      0               ;replaces kbchar in os3bdos
+KBBUFF: db      0               ;replaces kbchar in os3bdos
 B014:   db      43h             ;e45c 43
-B005:   DB      0               ;e45d 00
+BUFCNT: db      0               ;e45d 00
 B015:   db      0               ;e45e 00
-W003:   DW      0               ;e45f 00 00
-W004:   DW      0               ;e461 00 00
+kbwptr: dw      0               ;e45f 00 00
+W004:   dw      0               ;e461 00 00
 W015:   dw      0               ;e463 00 00
 W016:   dw      0               ;e465 00 00
 INIT1:  di
@@ -107,7 +100,7 @@ INIT1:  di
         sta     0038h           ; Set up interrupt vector
         lxi     h, INTRP
         shld    0039h
-        mvi     a, 0eh          ; PPIC7 = 0
+        mvi     a, 0eh          ; PPIC[7] = 0
         out     PPICW
         call    L001
         call    L073
@@ -124,9 +117,9 @@ L002:   mov     m, a            ; Clear byte in W001
 ;
         sta     B001
         sta     B003
-        sta     B005
-        lxi     h, XXXBUF       ; What buffer is this?
-        shld    W003
+        sta     BUFCNT
+        lxi     h, KBDBUF
+        shld    kbwptr
         shld    W004
                                 ; N.B D = 0 - so start of screen
         lxi     h, 0000h        ; Start of CPU-2 RAM block
@@ -179,13 +172,14 @@ INTRP:  SSPD    INTSTK
         push    d
         push    b
         push    psw
-L008:   in      PPIB
-        ani     04h
-        JRZ     L009
-        call    L004
-        lxi     h, B008
-        mvi     m, 00h
-LX00:   in      INTRST
+        in      PPIB
+        ani     04h             ; Vertical sync?
+        JRZ     ihsync
+;;; Vertical sync
+        call    L004            ; here for vsync
+        lxi     h, vlinum
+        mvi     m, 00h          ; Clear line number
+intrpx: in      INTRST
         pop     psw
         pop     b
         pop     d
@@ -194,12 +188,12 @@ LX00:   in      INTRST
         ei
         RETI
 ;
-L009:   call    L025            ;e515
-        lxi     h, B008
-        inr     m
-        JR      LX00
+ihsync: call    L025            ;e515
+        lxi     h, vlinum
+        inr     m               ; Step line number
+        JR      intrpx
 ;;;INIT1
-L004:   call    L012            ;e51e
+L004:   call    vidpts            ;e51e
         lxi     h, W002
         lxi     d, W001
         lxi     b, 0018h
@@ -208,11 +202,11 @@ L004:   call    L012            ;e51e
         shld    W012
         call    L025
         call    L027
-        lda     B010
+        lda     belctr
         dcr     a
-        sta     B010
+        sta     belctr
         JRNZ    L010
-        mvi     a, 0Ch
+        mvi     a, 0ch          ; PPIC[6] = 0 (Bell off)
         out     PPICW
 L010:   lda     B014
         ora     a
@@ -226,7 +220,7 @@ L010:   lda     B014
 L011:   call    L013
         ret
 ;
-L012:   lhld    W016           ;e55c
+vidpts: lhld    W016           ;e55c
         shld    W015
         lhld    W011
         shld    W010
@@ -238,7 +232,7 @@ L012:   lhld    W016           ;e55c
         mov     a, d
         ani     0fh
         mov     d, a
-        mvi     a, 01h          ; PPIC0 = 1
+        mvi     a, 01h          ; PPIC[0] = 1 swap addr and data buses
         out     PPICW
         mvi     a, 03h          ; CRSOR
         mov     m, a
@@ -247,43 +241,43 @@ L012:   lhld    W016           ;e55c
         mov     m, a
         mvi     a, 02h          ; What's this? attributes? SB-II guess...
         mov     m, a
-        mvi     a, 00h          ; PPIC0 = 0
+        mvi     a, 00h          ; PPIC[0] = 0
         out     PPICW
         ret
 ;
-L013:   in      PPIB           ;e587
-        mov     c, a
-        ani     02h             ; Any key down
+L013:   in      PPIB            ; Get port B
+        mov     c, a            ; Save
+        ani     02h             ; Any key down?
         JRZ     L018
-        mov     a, c
+        mov     a, c            ; Recover saved Port B
         ani     01h             ; New keyboard character
         JRZ     L016
         call    L021
         mvi     a, 28h
 L020:   sta     B011
-        lda     HDSHAK
+        lda     KEYCLK          ; Configured for key-click
         ora     a
-        JRZ     L014
-        mvi     a, 0dh
+        JRZ     knoclk          ; No...
+        mvi     a, 0dh          ; PPIC[6] = 1 (Bell on)
         out     PPICW
-        mvi     a, 01h
-        sta     B010
-L014:   in      KBCHAR
-        mov     b, a
-        cpi     0f1h
+        mvi     a, 01h          ; Bell duration
+        sta     belctr
+knoclk: in      KBCHAR          ; Read character
+        mov     b, a            ; Save character
+        cpi     0f1h            ; ??
         JRZ     L019
-        mov     a, c
-        ani     10h
-        JRNZ    L015
-        mov     a, b
-        sui     61h
-        jm      L015
-        sui     1Ah
-        jp      L015
-        mov     a, b
-        ani     5fh
-        mov     b, a
-L015:   call    L022            ;e5c5
+        mov     a, c            ; Recover saved Port B
+        ani     10h             ; Bit[4] - caps lock
+        JRNZ    kstore
+        mov     a, b            ; Recover character
+        sui     61h             ; 'a'
+        jm      kstore          ; < 'a' - leave unchanged
+        sui     1Ah             ; 26
+        jp      kstore          ; >= 26 - leave unchanged
+        mov     a, b            ; Recover character ('a' to 'z')
+        ani     5fh             ; Map to capital letter
+        mov     b, a            ; Replace character
+kstore: call    kbstbf          ; Store in buffer
         ret
 ;
 L016:   lda     B011           ;e5c9
@@ -304,51 +298,51 @@ L019:   call    L021            ;e5de
         mvi     a, 28h
         sta     B011
         xra     a
-        sta     KBDCHR
-        sta     B005
-        lxi     h, XXXBUF
-        shld    W003
+        sta     KBBUFF
+        sta     BUFCNT
+        lxi     h, KBDBUF
+        shld    kbwptr
         shld    W004
         ret
 ;
-L021:   mvi     a, 0eh          ;e5f7
+L021:   mvi     a, 0eh          ; PPIC[7] = 0  ??? what's this do ???
         out     PPICW
-        inr     a
+        inr     a               ; PPIC[7] = 1
         out     PPICW
         ret
 ;
-L022:   lda     B005            ;e5ff
-        cpi     80h
-        JRZ     L024
-        inr     a
-        sta     B005
-        lhld    W003
-        lxi     d, YYYBUF
-        mov     a, l
+kbstbf: lda     BUFCNT          ; Characters in the buffer
+        cpi     80h             ; Is it full?
+        JRZ     kbfull          ; Yes, ring bell
+        inr     a               ; Step counter
+        sta     BUFCNT
+        lhld    kbwptr          ; Get buffer write pointer
+        lxi     d, KBDBFE       ; One beyond the end of the buffer
+        mov     a, l            ; Compare to write pointer
         cmp     e
-        JRNZ    L023
+        JRNZ    kbstb1          ; Pointer don't match
         mov     a, h
         cmp     d
-        JRNZ    L023
-        lxi     h, XXXBUF
-L023:   mov     m, b            ;e61b
-        inx     h
-        shld    W003
+        JRNZ    kbstb1          ; Pointer don't match
+        lxi     h, KBDBUF       ; Beyond end of buffer, go to start
+kbstb1: mov     m, b            ; Store character in buffer
+        inx     h               ; Increment write pointer
+        shld    kbwptr          ; and save
         ret
 ;
-L024:   jmp     L058           ;e621
-;;; L001[INIT1]
+kbfull: jmp     rngbel          ; Ring bell - keyboard buffer full
+;;;
 L025:   lhld    W012           ;e624
         mov     a, m
         inx     h
         shld    W012
         ora     a
         JRZ     L026
-        mvi     a, 02h
+        mvi     a, 02h          ; PPIC[1] = 0
         out     PPICW
         ret
 ;
-L026:   mvi     a, 03h          ;e634
+L026:   mvi     a, 03h          ; PPIC[1] = 1
         out     PPICW
         ret
 ;
@@ -391,7 +385,7 @@ L030a:  inr     c                ;e66e
 CRTIN1: call    L038            ;e674
         mov     b, a
         BIT     7,A
-        cnz     LX03
+        cnz     mapkpd
         cpi     00h
         JRZ     L031
         cpi     81h
@@ -402,7 +396,6 @@ CRTIN1: call    L038            ;e674
         JRZ     L034
         cpi     85h
         JRZ     L035
-
         cpi     80h
         JRZ     L036
         JR      L037
@@ -429,43 +422,45 @@ L036:   mvi     a, 0fh  ;e6b1
 L037:   mov     a, b    ;e6bd
         ret
 ;;; CRTIN1
-L038:   lxi     h, B005 ;e6bf
+L038:   lxi     h, BUFCNT ;e6bf
         di
         dcr     m
         ei
         lhld    W004
-        lxi     d, YYYBUF
+        lxi     d, KBDBFE
         mov     a, l
         cmp     e
         JRNZ    L039
         mov     a, h
         cmp     d
         JRNZ    L039
-        lxi     h, XXXBUF
+        lxi     h, KBDBUF
 L039:   mov     a, m
         inx     h
         shld    W004
         ret
 ;
-LX03:   push    b
-        lxi     h, B016
-        lxi     b, 0012h
-        CCDR                    ;aka CPDR
-        JRNZ    L040
-        lxi     h, KEYPAD
-        dad     b               ;??? Is it b (lost its argument)
-        mov     a, m
-        pop     b
-        mov     b, a
-        JR      L041
-L040:   pop     b       ;e6f0
-L041:   ret
+mapkpd: push    b               ; Save character
+        lxi     h, kpdcds       ; Table of key codes
+        lxi     b, 18           ; 18 keys on the keypad
+        CCDR                    ; aka CPDR
+        JRNZ    notkpd          ; None match
+        lxi     h, KEYPAD       ; Point at table in CONFIG
+        dad     b               ; Offset into table
+        mov     a, m            ; Pick up mapped character
+        pop     b               ; Adjust stack
+        mov     b, a            ; Return mapped character
+        JR      mapkpx
+notkpd: pop     b               ; Recover unchanged code
+mapkpx: ret
+;;; Table of keypad key-codes
         db      081h, 082h, 083h, 085h
         db      08Dh, 0ACh, 0ADh, 0AEh
         db      0B0h, 0B1h, 0B2h, 0B3h
         db      0B4h, 0B5h, 0B6h, 0B7h
         db      0B8h
-B016:   db      0B9h            ;e703
+kpdcds: db      0B9h
+;;; 
 CRTOU1: mov     b, c            ;1f84+offset
         mov     a, c
         cpi     1bh
@@ -529,7 +524,7 @@ L046:   lda     B015               ;e769
         lda     TIMENB
         ora     a
         JRZ     L048
-L047:   lda     B008   ;e774
+L047:   lda     vlinum   ;e774
         sui     15h
         jp      L047
 L048:   di              ;e77c
@@ -616,29 +611,29 @@ L054:   mov     a, h
         ret
 ;
 L055:   mov     a, b    ;e80c
-        cpi     01h
+        cpi     01h             ; SOH - Home cursor
         JRZ     L056
-        cpi     02h
-        JRZ     L057
-        cpi     07h
-        JRZ     L058
-        cpi     09h
+        cpi     02h             ; STX - Toggle Key-clock
+        JRZ     tglclk
+        cpi     07h             ; BEL - Ring Bell
+        JRZ     rngbel
+        cpi     09h             ; HT  - Tab
         JRZ     L059
-        cpi     0dh
+        cpi     0dh             ; CR
         JRZ     L060
-        cpi     14h
+        cpi     14h             ; DC4
         JRZ     L061
-        cpi     0bh
+        cpi     0bh             ; VT  - Cursor up
         JRZ     L062
-        cpi     06h
+        cpi     06h             ; ACK - Cursor forwards
         JRZ     L063
-        cpi     0ah
+        cpi     0ah             ; LF  - Cursor down
         jz      L064
-        cpi     0ch
+        cpi     0ch             ; FF  - Clear screen
         jz      L065
-        cpi     15h
+        cpi     15h             ; NAK - 
         jz      L066
-        cpi     08h
+        cpi     08h             ; BS
         jz      L066
         ret
 ;
@@ -647,17 +642,20 @@ L056:   lxi     h, 0000h
         lhld    W011
         shld    W009
         ret
-L057:   lxi     h, HDSHAK
+;;; 
+tglclk: lxi     h, KEYCLK       ; Toggle key click
         mov     a, m
         inr     a
         ani     01h
         mov     m, a
         ret
-L058:   mvi     a, 0dh
+;;;
+rngbel: mvi     a, 0dh          ; PPIC[6] = 1 (Bell on)
         out     PPICW
-        mvi     a, 0fh
-        sta     B010
+        mvi     a, 0fh          ; Bell duration
+        sta     belctr
         ret
+;;;
 L059:   call    L063
         mov     a, l
         ani     07h
@@ -1056,7 +1054,7 @@ busbsy: in      PPIB            ; Wait for CPU2
         JRC     busbsy
         mvi     a, 08h          ;PPIC[4] Low
         out     PPICW
-buso2:  ret                     ;Label may not be required (junk below)
+        ret
 ;
 buscls: mvi     a, 09h          ;PPIC[4] High
         out     PPICW
