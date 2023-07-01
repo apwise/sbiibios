@@ -12,7 +12,8 @@ KBDBUF  EQU     5F00H+OFFSET    ;128 BYTE KEYBOARD BUFFER
 KBDBFE  EQU     5F80H+OFFSET    ;END OF KEYBOARD BUFFER (BOTTOM OF STACK3)
 CONFIG  EQU     5B00H+OFFSET    ;Configuration table read from disk
 MNCMD   EQU     CONFIG+2        ;MAIN PORT COMMAND BYTE
-PRTA    EQU     CONFIG+5        ;Port A current value (initial value on disk)
+FREQ    EQU     CONFIG+5        ;4BH=60HZ, 0BH=50H
+prta    EQU     FREQ            ; also maintains current PPIA value
 TIMENB  EQU     CONFIG+8        ;00 = TIME FUNCTION DISABLED; FF = TIME ENABLED
 SYNC    EQU     CONFIG+9        ;Sync byte
 KEYCLK  EQU     CONFIG+10       ;Handshake byte
@@ -48,6 +49,7 @@ KEYDLY  EQU     40              ;KEY DELAY BEFORE REPEAT
 RPTTIM  EQU      1              ;KEY REPEAT TIME LOOP
 BRKTIM  EQU      15             ;250 MILLISEC BREAK TIME FOR COMM PORT
 LPF     EQU      24             ;NO. OF ROWS ON CRT
+RTCSEC  EQU     32H
 ;
         ASEG
         ORG     PVBIOS
@@ -60,20 +62,22 @@ INIT:   jmp     INIT1           ;e406
 CRTIN:  jmp     CRTIN1          ;e409
 CRTOUT: jmp     CRTOU1          ;e40c
 DISK:   jmp     DISK1           ;e40f
-W009:   dw      0000h           ;e412
-W010:   dw      0000h           ;e414
-W011:   dw      0000h           ;e416
+vcursr: dw      0000h           ;e412
+vtopsc: dw      0000h           ; Copy of vtopsl for this frame
+vtopsl: dw      0000h           ; Video top select
 B009:   db      00h             ;e418
-W012:   dw      0000h           ;e419
-W001:   db      39h, 33h, 45h, 30h, 41h, 0dh, 0ah, 3ah
+vblnkp: dw      0000h           ;e419
+;;; Copy of vblnk used (in interrupt routine) during video frame
+vblnkc: db      39h, 33h, 45h, 30h, 41h, 0dh, 0ah, 3ah
         db      31h, 38h, 45h, 37h, 31h, 35h, 30h, 30h
         db      30h, 44h, 44h, 33h, 36h, 42h, 33h, 45h
         db      30h
-W002:   db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
+;;; Video blanking - 1 byte per row of video
+vblnk:  db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
         db      39h, 43h, 44h, 45h, 45h, 45h, 36h, 37h
         db      44h, 45h, 36h, 30h, 37h, 43h, 32h, 31h
         db      45h
-belctr:   db      45h             ;e44d 45
+belctr: db      45h             ;e44d 45
 B011:   db      37h             ;e44e 37
 B012:   db      00h             ;e44f 00
 B001:   DB      0               ;e450 00
@@ -81,40 +85,47 @@ B002:   DB      32h             ;e451 32
 B003:   DB      41h             ;e452 41
 B004:   DB      31h             ;e453 31
 B007:   DB      32h             ;e454 32
-vlinum:   DB      43h             ;e455 43
+vlinum: DB      43h             ;e455 43
 INTSTK: DW      3134h           ;Save SP during interrupts
 dskptr: dw      0               ;e458 00 00
 B013:   db      0               ;e45a 00
 KBBUFF: db      0               ;replaces kbchar in os3bdos
-B014:   db      43h             ;e45c 43
+brkctr: db      43h             ; Main port break time counter
 BUFCNT: db      0               ;e45d 00
 B015:   db      0               ;e45e 00
 kbwptr: dw      0               ;e45f 00 00
 W004:   dw      0               ;e461 00 00
-W015:   dw      0               ;e463 00 00
-W016:   dw      0               ;e465 00 00
+timpsc: dw      0               ; Copy of timpos for current frame
+timpos: dw      0               ; Position tor time display on top line
+;;;
+;;; Initialization
 INIT1:  di
-        lda     PRTA            ; Initialize 50Hz/60Hz
+        lda     prta            ; Initialize 50Hz/60Hz
         out     PPIA
+;;; Set up interrupt vector
         mvi     a, 0c3h
-        sta     0038h           ; Set up interrupt vector
+        sta     0038h           ; JMP opcode
         lxi     h, INTRP
-        shld    0039h
+        shld    0039h           ; Address of interrupt routine
+;;;
         mvi     a, 0eh          ; PPIC[7] = 0
-        out     PPICW
+        out     PPICW           ; New keyboard char ack.
+;;;
         call    L001
-        call    L073
-        lxi     h, W001
-        lxi     d, W002
-        mvi     b, 18h          ; 24 bytes
+        call    vinipt
+;;;
+;;; Clear video blanking buffers
+        lxi     h, vblnkc
+        lxi     d, vblnk
+        mvi     b, 18h          ; 24 bytes - 1 per row
         xra     a
-L002:   mov     m, a            ; Clear byte in W001
-        stax    d               ; Clear byte in W002
+L002:   mov     m, a            ; Clear byte in vblnkc
+        stax    d               ; Clear byte in vblnk
         inx     h               ; increment pointers
         inx     d
         dcr     b
         JRNZ    L002
-;
+;;;
         sta     B001
         sta     B003
         sta     BUFCNT
@@ -125,7 +136,7 @@ L002:   mov     m, a            ; Clear byte in W001
         lxi     h, 0000h        ; Start of CPU-2 RAM block
         mvi     b, 50h          ; 80 characters - screen line length
         call    L003
-        call    L004
+        call    ivsync
         out     48h
         IM1
         ei
@@ -176,7 +187,7 @@ INTRP:  SSPD    INTSTK
         ani     04h             ; Vertical sync?
         JRZ     ihsync
 ;;; Vertical sync
-        call    L004            ; here for vsync
+        call    ivsync
         lxi     h, vlinum
         mvi     m, 00h          ; Clear line number
 intrpx: in      INTRST
@@ -188,60 +199,65 @@ intrpx: in      INTRST
         ei
         RETI
 ;
-ihsync: call    L025            ;e515
+ihsync: call    vsetbl          ; Set blanking for the next row
         lxi     h, vlinum
         inr     m               ; Step line number
         JR      intrpx
-;;;INIT1
-L004:   call    vidpts            ;e51e
-        lxi     h, W002
-        lxi     d, W001
-        lxi     b, 0018h
+;;;
+ivsync: call    vidpts          ; Send video pointers to controller
+;;;
+        lxi     h, vblnk        ; Copy array from vblnk to vblnkc
+        lxi     d, vblnkc
+        lxi     b, 0018h        ; 24 bytes (but there are 25 allocated?)
         LDIR
-        lxi     h, W001
-        shld    W012
-        call    L025
-        call    L027
+;;;
+        lxi     h, vblnkc       ; Start of (copy of) blanking array
+        shld    vblnkp          ; Initialize pointer for the frame
+        call    vsetbl          ; Set blanking for the first row
+        call    rtcdpy          ; Display time on screen
+;;;
         lda     belctr
         dcr     a
         sta     belctr
-        JRNZ    L010
+        JRNZ    ivsyn1
         mvi     a, 0ch          ; PPIC[6] = 0 (Bell off)
         out     PPICW
-L010:   lda     B014
+ivsyn1: lda     brkctr
         ora     a
-        JRZ     L011
+        JRZ     ivsyn2
         dcr     a
-        sta     B014
-        JRNZ    L011
+        sta     brkctr
+        JRNZ    ivsyn2
         lda     MNCMD
-        ani     0f7h
+        ani     0f7h            ; Clear the break bit
         out     MNSTAT
-L011:   call    L013
+ivsyn2: call    L013
         ret
 ;
-vidpts: lhld    W016           ;e55c
-        shld    W015
-        lhld    W011
-        shld    W010
+vidpts: lhld    timpos          ; Take copy of time display position
+        shld    timpsc
+        lhld    vtopsl          ; Take copy of video top select
+        shld    vtopsc
         xchg
-        lhld    W009
+        lhld    vcursr          ; Cursor position
+;;;
         mov     a, h
-        ani     0fh             ; Limit to 12-bit address
+        ani     0fh             ; Limit to 12-bit address (but why not 11-bit since it's 2K?)
         mov     h, a
         mov     a, d
         ani     0fh
         mov     d, a
+;;;
         mvi     a, 01h          ; PPIC[0] = 1 swap addr and data buses
         out     PPICW
-        mvi     a, 03h          ; CRSOR
-        mov     m, a
-        mvi     a, 01h          ; TOPSEL
+        mvi     a, CURSOR
+        mov     m, a            ; Set cursor address
+        mvi     a, ROWSTR
         xchg
-        mov     m, a
-        mvi     a, 02h          ; What's this? attributes? SB-II guess...
-        mov     m, a
-        mvi     a, 00h          ; PPIC[0] = 0
+        mov     m, a            ; Set row start (for first row)
+        mvi     a, TOPSEL
+        mov     m, a            ; which is also the top of scrren
+        mvi     a, 00h          ; PPIC[0] = 0 - addr/data bus back to normal
         out     PPICW
         ret
 ;
@@ -285,7 +301,7 @@ L016:   lda     B011           ;e5c9
         JRNZ    L017
         mvi     a, 01h
         JR      L020
-;       
+;
 L017:   dcr     a               ;e5d3
         sta     B011
         ret
@@ -332,54 +348,55 @@ kbstb1: mov     m, b            ; Store character in buffer
 ;
 kbfull: jmp     rngbel          ; Ring bell - keyboard buffer full
 ;;;
-L025:   lhld    W012           ;e624
-        mov     a, m
-        inx     h
-        shld    W012
-        ora     a
-        JRZ     L026
-        mvi     a, 02h          ; PPIC[1] = 0
+vsetbl: lhld    vblnkp          ; Point into vblnkc array
+        mov     a, m            ; Pick up flag for current line
+        inx     h               ; Step pointer
+        shld    vblnkp          ; Save for next line
+        ora     a               ; Test flag
+        JRZ     vblnkr
+        mvi     a, 02h          ; PPIC[1] = 0 Display video row
         out     PPICW
         ret
 ;
-L026:   mvi     a, 03h          ; PPIC[1] = 1
+vblnkr: mvi     a, 03h          ; PPIC[1] = 1 Blank video row
         out     PPICW
         ret
 ;
-L027:   lda     TIMENB           ;e639
+rtcdpy: lda     TIMENB          ; Is time display enabled?
         ora     a
-        rz
-        lhld    W015
-        lxi     d, 0009h
+        rz                      ; No - return
+        lhld    timpsc          ; First row address?
+        lxi     d, 0009h        ; 9 characters in time display
         dad     d
-        mvi     c, 32h          ; What port is this? RTC?
-        mvi     e, 02h
-        mvi     b, 06h
-L030:   mov     a, h
+        mvi     c, RTCSEC
+        mvi     e, 02h          ; Digits between ':' chars
+        mvi     b, 06h          ; Total digits
+rtclp:  mov     a, h            ; Force address into video RAM area
         ori     0f8h
         mov     h, a
-        mvi     d, 0ah
-L028:   INP     A
-        ani     0fh
-        cpi     0fh
-        JRNZ    L029
-        dcr     d
-        jnz     L028
+        mvi     d, 10           ; Read attempt counter
+rtcrdl: INP     A               ; Read RTC register
+        ani     0fh             ; Drop upper 4 bits
+        cpi     0fh             ; Is it ready?
+        JRNZ    rtcasc          ; yes
+        dcr     d               ; No - decrement try counter
+        jnz     rtcrdl
+;;; Timeout
         xra     a
-        sta     TIMENB
+        sta     TIMENB          ; Clear time display enable
         ret
 ;
-L029:   ori     30h     ;e662
-        dcx     h
-        mov     m, a
-        dcr     e
-        JRNZ    L030a
-        dcx     h
-        mvi     m, 3ah
-        mvi     e, 02h
-L030a:  inr     c                ;e66e
-        DJNZ    L030
-        mvi     m, 20h
+rtcasc: ori     30h             ; Convert to ASCII digit
+        dcx     h               ; Decrement address
+        mov     m, a            ; Save character
+        dcr     e               ; Decrement characters to ':' counter
+        JRNZ    rtcnxt
+        dcx     h               ; Decremnt address
+        mvi     m, 3ah          ; ASCII ':' character
+        mvi     e, 02h          ; Reset counter
+rtcnxt: inr     c               ; Increment port address
+        DJNZ    rtclp
+        mvi     m, 20h          ; Insert space before time
         ret
 ;
 CRTIN1: call    L038            ;e674
@@ -397,7 +414,7 @@ CRTIN1: call    L038            ;e674
         cpi     85h
         JRZ     L035
         cpi     80h
-        JRZ     L036
+        JRZ     break
         JR      L037
 ;
 L031:   lxi     h, B015        ;e697
@@ -414,10 +431,11 @@ L033:   mvi     b, 06h  ;e6a9
         JR      L037
 L035:   mvi     b, 0ah  ;e6ad
         JR      L037
-L036:   mvi     a, 0fh  ;e6b1
-        sta     B014
+;;;
+break:  mvi     a, 0fh          ; Set time to 15 video frames
+        sta     brkctr          ; (~0.25 seconds)
         lda     MNCMD
-        ori     08h
+        ori     08h             ; Set break bit
         out     MNSTAT
 L037:   mov     a, b    ;e6bd
         ret
@@ -460,7 +478,7 @@ mapkpx: ret
         db      0B4h, 0B5h, 0B6h, 0B7h
         db      0B8h
 kpdcds: db      0B9h
-;;; 
+;;;
 CRTOU1: mov     b, c            ;1f84+offset
         mov     a, c
         cpi     1bh
@@ -484,7 +502,7 @@ L043:   ani     7fh             ;e723
         mov     a, m
         ora     a
         cz      L052
-        lhld    W009
+        lhld    vcursr
         mov     a, h
         ori     0f8h
         mov     h, a
@@ -495,7 +513,7 @@ L043:   ani     7fh             ;e723
         ori     80h
 L044:   mov     m, a    ;e742
         di
-        lda     PRTA
+        lda     prta
         ani     0dfh
         out     PPIA
         EXAF
@@ -511,7 +529,7 @@ L044:   mov     m, a    ;e742
         call    L063
         ret
 ;;; CRTOU1
-L045:   lxi     h, W002         ;e75e
+L045:   lxi     h, vblnk         ;e75e
         mvi     d, 00h
         lda     W007H
         mov     e, a
@@ -528,28 +546,28 @@ L047:   lda     vlinum   ;e774
         sui     15h
         jp      L047
 L048:   di              ;e77c
-        lhld    W011
-        lxi     d, 0050h
+        lhld    vtopsl
+        lxi     d, 0050h        ; 80 - line length
         dad     d
-        shld    W011
-        lhld    W016
+        shld    vtopsl
+        lhld    timpos
         dad     d
-        shld    W016
-        lxi     h, W002+1
-        lxi     d, W002
+        shld    timpos
+        lxi     h, vblnk+1
+        lxi     d, vblnk
         lxi     b, 0017h
         LDIR
         xra     a
         stax    d
         ei
-        lxi     h, W002
+        lxi     h, vblnk
         mov     a, m
         ora     a
         rnz
         mvi     b, 50h          ; Line length
-        lhld    W011           ; e416 must store address in screen CPU2 RAM
+        lhld    vtopsl           ; e416 must store address in screen CPU2 RAM
         call    L003            ; clear it (and in CPU2 RAM)
-        lxi     h, W002
+        lxi     h, vblnk
         mvi     m, 0ffh
         ret
 ;
@@ -564,7 +582,7 @@ L050:   SLAR    E
         RALR    D               ;aka RL
         dcr     b
         JRNZ    L051
-        LDED    W011
+        LDED    vtopsl
         dad     d
         ret
 ;
@@ -589,9 +607,9 @@ L053:   mov     a, d
         DJNZ    L053
         pop     h
         di
-        lda     PRTA
-        ani     0dfh             ; PRTA = xx0xxxxx - clear bit 6
-        sta     PRTA            ; Map CPU-2 RAM to 4800h ?
+        lda     prta
+        ani     0dfh             ; prta = xx0xxxxx - clear bit 6
+        sta     prta            ; Map CPU-2 RAM to 4800h ?
         out     PPIA
         ei
         mov     b, c            ; Recover B
@@ -603,9 +621,9 @@ L054:   mov     a, h
         inx     h
         DJNZ    L054
         di
-        lda     PRTA
-        ori     20h             ; PRTA = xx1xxxxx - set bit 6
-        sta     PRTA            ; Map CPU-2 RAM to 4800h DRAM back
+        lda     prta
+        ori     20h             ; prta = xx1xxxxx - set bit 6
+        sta     prta            ; Map CPU-2 RAM to 4800h DRAM back
         out     PPIA
         ei
         ret
@@ -631,7 +649,7 @@ L055:   mov     a, b    ;e80c
         jz      L064
         cpi     0ch             ; FF  - Clear screen
         jz      L065
-        cpi     15h             ; NAK - 
+        cpi     15h             ; NAK -
         jz      L066
         cpi     08h             ; BS
         jz      L066
@@ -639,10 +657,10 @@ L055:   mov     a, b    ;e80c
 ;
 L056:   lxi     h, 0000h
         shld    W007
-        lhld    W011
-        shld    W009
+        lhld    vtopsl
+        shld    vcursr
         ret
-;;; 
+;;;
 tglclk: lxi     h, KEYCLK       ; Toggle key click
         mov     a, m
         inr     a
@@ -662,7 +680,7 @@ L059:   call    L063
         JRNZ    L059
         ret
 L060:   call    L049
-        shld    W009
+        shld    vcursr
         mvi     a, 00h
         sta     W007
         ret
@@ -672,7 +690,7 @@ L061:   lxi     h, TIMENB
         ani     01h
         mov     m, a
         rnz
-        lhld    W016
+        lhld    timpos
         mvi     b, 0bh
         call    L003
         ret
@@ -681,15 +699,15 @@ L062:   lda     W007H
         rz
         dcr     a
         sta     W007H
-        lhld    W009
+        lhld    vcursr
         lxi     d, 0ffb0h
         dad     d
-        shld    W009
+        shld    vcursr
         ret
 ;;; CRTOUT
-L063:   lhld    W009           ;e89d
+L063:   lhld    vcursr           ;e89d
         inx     h
-        shld    W009
+        shld    vcursr
         lhld    W007
         inr     l
         mov     a, l
@@ -707,10 +725,10 @@ L063:   lhld    W009           ;e89d
 L068:   inr     h
 L067:   shld    W007
         ret
-L064:   lhld    W009   ;e8c0 2a
+L064:   lhld    vcursr   ;e8c0 2a
         lxi     d, 0050h
         dad     d
-        shld    W009
+        shld    vcursr
         lda     w007H
         cpi     17h
         JRNZ    L069
@@ -719,17 +737,17 @@ L064:   lhld    W009   ;e8c0 2a
 L069:   inr     a
         sta     W007H
         ret
-L065:   lxi     h, W002 ;e8da
+L065:   lxi     h, vblnk ;e8da
         mvi     b, 18h
         xra     a
 L070:   mov     m, a
         inx     h
         DJNZ    L070
-        call    L073
+        call    vinipt
         lxi     h, 0000h
         mvi     b, 50h
         call    L003
-        lxi     h, W002
+        lxi     h, vblnk
         mvi     m, 0ffh
         ret
 L066:   lhld    W007
@@ -745,19 +763,20 @@ L066:   lhld    W007
 ;
 L071:   dcr     l
 L072:   shld    W007
-        lhld    W009
+        lhld    vcursr
         dcx     h
-        shld    W009
+        shld    vcursr
         ret
-;;; INIT1
-L073:   lxi     h,0000h  ;e910
+;;;
+;;; Initialize video pointer
+vinipt: lxi     h,0000h
         shld    W007
-        shld    W010
-        shld    W011
-        shld    W009
-        lxi     d, 0045h
+        shld    vtopsc
+        shld    vtopsl
+        shld    vcursr
+        lxi     d, 0045h        ; 69 + 9 = 78 (_00:00:00__)
         dad     d
-        shld    W016
+        shld    timpos
         ret
 ;
 L074:   mvi     a, 01h  ;e927
@@ -794,7 +813,7 @@ L081:   mvi     a, 02h
 L080:   mvi     a, 0ffh  ;e95d
         sta     B002
         JR      L081
-;       
+;
 L077:   lda     B002   ;e964
         ora     a
         JRNZ    L082
@@ -826,7 +845,7 @@ L078:   mov     a, b    ;e980
         lhld    W007
         mvi     h, 00h
         dad     d
-        shld    W009
+        shld    vcursr
         ret
 L082:   xra     a           ;e9a8
         sta     B001
@@ -855,7 +874,7 @@ L082:   xra     a           ;e9a8
         JRZ     L093
         cpi     53h
         JRZ     L094
-        lxi     h, PRTA
+        lxi     h, prta
         cpi     67h
         JRZ     L095
         cpi     47h
@@ -987,9 +1006,9 @@ dread:  push    h               ; Save data pointer (why is dskptr not used?)
         pop     h               ; Recover data pointer
         call    fp2hst          ; Copy data from CPU2
         call    fpstat          ; Get status to return
-        JR      dexit   
+        JR      dexit
 ;
-dfrmt:  call    fparam          ; Send parameters  
+dfrmt:  call    fparam          ; Send parameters
         mvi     b, 80h
 dfrmt1: push    h               ; Waste time for command to start
         pop     h
@@ -1061,5 +1080,5 @@ buscls: mvi     a, 09h          ;PPIC[4] High
         mvi     a, 0bh
         out     PPICW           ;PPIC[5] High
         ret
-; 
+;
         end
