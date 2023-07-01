@@ -47,9 +47,9 @@ CURSOR  EQU     03H             ;CRTC CURSOR REGISTER
 BELTIM  EQU     15              ;BELL TIME LOOP
 KEYDLY  EQU     40              ;KEY DELAY BEFORE REPEAT
 RPTTIM  EQU      1              ;KEY REPEAT TIME LOOP
-BRKTIM  EQU      15             ;250 MILLISEC BREAK TIME FOR COMM PORT
-LPF     EQU      24             ;NO. OF ROWS ON CRT
-RTCSEC  EQU     32H
+BRKTIM  EQU     15              ;250 MILLISEC BREAK TIME FOR COMM PORT
+LPF     EQU     24              ;NO. OF ROWS ON CRT
+RTCSEC  EQU     32H             ; Seconds register in RTC
 ;
         ASEG
         ORG     PVBIOS
@@ -58,10 +58,10 @@ W007:   dw      3745h           ;e400
 W007H   EQU     W007+1
 CONSTK: dw      3545h           ;Save SP during console routines
 DSKSTK: dw      4443h           ;Save SP during disk routines
-INIT:   jmp     INIT1           ;e406
-CRTIN:  jmp     CRTIN1          ;e409
-CRTOUT: jmp     CRTOU1          ;e40c
-DISK:   jmp     DISK1           ;e40f
+INIT:   jmp     init1           ;e406
+CRTIN:  jmp     crtin1          ;e409
+CRTOUT: jmp     crtou1          ;e40c
+DISK:   jmp     disk1           ;e40f
 vcursr: dw      0000h           ;e412
 vtopsc: dw      0000h           ; Copy of vtopsl for this frame
 vtopsl: dw      0000h           ; Video top select
@@ -77,8 +77,8 @@ vblnk:  db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
         db      39h, 43h, 44h, 45h, 45h, 45h, 36h, 37h
         db      44h, 45h, 36h, 30h, 37h, 43h, 32h, 31h
         db      45h
-belctr: db      45h             ;e44d 45
-B011:   db      37h             ;e44e 37
+belctr: db      45h             ; Bell counter
+krptct: db      37h             ; Keyboard repeat counter
 B012:   db      00h             ;e44f 00
 B001:   DB      0               ;e450 00
 B002:   DB      32h             ;e451 32
@@ -92,14 +92,14 @@ B013:   db      0               ;e45a 00
 KBBUFF: db      0               ;replaces kbchar in os3bdos
 brkctr: db      43h             ; Main port break time counter
 BUFCNT: db      0               ;e45d 00
-B015:   db      0               ;e45e 00
-kbwptr: dw      0               ;e45f 00 00
-W004:   dw      0               ;e461 00 00
+scrlck: db      0               ; Scroll lock XXXX keep as DB - not initialized
+kbwptr: dw      0               ; type-ahead buffer write pointer
+kbrptr: dw      0               ; type-ahead buffer read pointer
 timpsc: dw      0               ; Copy of timpos for current frame
 timpos: dw      0               ; Position tor time display on top line
 ;;;
 ;;; Initialization
-INIT1:  di
+init1:  di
         lda     prta            ; Initialize 50Hz/60Hz
         out     PPIA
 ;;; Set up interrupt vector
@@ -117,7 +117,7 @@ INIT1:  di
 ;;; Clear video blanking buffers
         lxi     h, vblnkc
         lxi     d, vblnk
-        mvi     b, 18h          ; 24 bytes - 1 per row
+        mvi     b, LPF          ; LPF bytes - 1 per line
         xra     a
 L002:   mov     m, a            ; Clear byte in vblnkc
         stax    d               ; Clear byte in vblnk
@@ -131,7 +131,7 @@ L002:   mov     m, a            ; Clear byte in vblnkc
         sta     BUFCNT
         lxi     h, KBDBUF
         shld    kbwptr
-        shld    W004
+        shld    kbrptr
                                 ; N.B D = 0 - so start of screen
         lxi     h, 0000h        ; Start of CPU-2 RAM block
         mvi     b, 50h          ; 80 characters - screen line length
@@ -141,7 +141,7 @@ L002:   mov     m, a            ; Clear byte in vblnkc
         IM1
         ei
         ret
-;;; INIT1
+;;; init1
 L001:   lxi     h, CONFIG
         mov     a, m
         out     BDGEN
@@ -208,7 +208,7 @@ ivsync: call    vidpts          ; Send video pointers to controller
 ;;;
         lxi     h, vblnk        ; Copy array from vblnk to vblnkc
         lxi     d, vblnkc
-        lxi     b, 0018h        ; 24 bytes (but there are 25 allocated?)
+        lxi     b, LPF          ; 24 bytes (but there are 25 allocated?)
         LDIR
 ;;;
         lxi     h, vblnkc       ; Start of (copy of) blanking array
@@ -216,22 +216,22 @@ ivsync: call    vidpts          ; Send video pointers to controller
         call    vsetbl          ; Set blanking for the first row
         call    rtcdpy          ; Display time on screen
 ;;;
-        lda     belctr
+        lda     belctr          ; Decrement bell counter
         dcr     a
         sta     belctr
-        JRNZ    ivsyn1
+        JRNZ    ivsyn1          ; Leave bell on for now
         mvi     a, 0ch          ; PPIC[6] = 0 (Bell off)
         out     PPICW
-ivsyn1: lda     brkctr
+ivsyn1: lda     brkctr          ; Get main-port break counter
         ora     a
-        JRZ     ivsyn2
-        dcr     a
+        JRZ     ivsyn2          ; Not sending break
+        dcr     a               ; Decrement it
         sta     brkctr
-        JRNZ    ivsyn2
+        JRNZ    ivsyn2          ; Still a bit longer
         lda     MNCMD
         ani     0f7h            ; Clear the break bit
         out     MNSTAT
-ivsyn2: call    L013
+ivsyn2: call    keysrv
         ret
 ;
 vidpts: lhld    timpos          ; Take copy of time display position
@@ -260,18 +260,19 @@ vidpts: lhld    timpos          ; Take copy of time display position
         mvi     a, 00h          ; PPIC[0] = 0 - addr/data bus back to normal
         out     PPICW
         ret
-;
-L013:   in      PPIB            ; Get port B
+;;;
+;;; Service the keyboard (called from vertical sync interrupt)
+keysrv: in      PPIB            ; Get port B
         mov     c, a            ; Save
-        ani     02h             ; Any key down?
-        JRZ     L018
+        ani     02h             ; Any key (still) down?
+        JRZ     knodwn
         mov     a, c            ; Recover saved Port B
         ani     01h             ; New keyboard character
-        JRZ     L016
-        call    L021
-        mvi     a, 28h
-L020:   sta     B011
-        lda     KEYCLK          ; Configured for key-click
+        JRZ     knonew
+        call    keyack
+        mvi     a, KEYDLY       ; Set for initial wait to repeat
+keysr1: sta     krptct
+        lda     KEYCLK          ; Configured for key-click?
         ora     a
         JRZ     knoclk          ; No...
         mvi     a, 0dh          ; PPIC[6] = 1 (Bell on)
@@ -280,8 +281,8 @@ L020:   sta     B011
         sta     belctr
 knoclk: in      KBCHAR          ; Read character
         mov     b, a            ; Save character
-        cpi     0f1h            ; ??
-        JRZ     L019
+        cpi     0f1h            ; CTRL-1 ?
+        JRZ     keyclr
         mov     a, c            ; Recover saved Port B
         ani     10h             ; Bit[4] - caps lock
         JRNZ    kstore
@@ -296,32 +297,32 @@ knoclk: in      KBCHAR          ; Read character
 kstore: call    kbstbf          ; Store in buffer
         ret
 ;
-L016:   lda     B011           ;e5c9
+knonew: lda     krptct          ; Get keyboard repeat counter
         ora     a
-        JRNZ    L017
-        mvi     a, 01h
-        JR      L020
+        JRNZ    krptnz
+        mvi     a, RPTTIM       ; Set counter for next repeated key
+        JR      keysr1
 ;
-L017:   dcr     a               ;e5d3
-        sta     B011
+krptnz: dcr     a               ; Decrement counter
+        sta     krptct
         ret
 ;
-L018:   mvi     a, 0f0h          ;e5d8
-        sta     B011
+knodwn: mvi     a, 0f0h         ; Set repeat to a large number
+        sta     krptct          ; to deal with key bounce?
         ret
 ;
-L019:   call    L021            ;e5de
-        mvi     a, 28h
-        sta     B011
-        xra     a
+keyclr: call    keyack          ; Discard any pending character
+        mvi     a, KEYDLY       ; Set for initial wait to repeat
+        sta     krptct
+        xra     a               ; Clear buffer character
         sta     KBBUFF
         sta     BUFCNT
-        lxi     h, KBDBUF
+        lxi     h, KBDBUF       ; Reset type-ahead buffer pointer
         shld    kbwptr
-        shld    W004
+        shld    kbrptr
         ret
 ;
-L021:   mvi     a, 0eh          ; PPIC[7] = 0  ??? what's this do ???
+keyack: mvi     a, 0eh          ; PPIC[7] = 0  Acknowledge new key
         out     PPICW
         inr     a               ; PPIC[7] = 1
         out     PPICW
@@ -399,63 +400,66 @@ rtcnxt: inr     c               ; Increment port address
         mvi     m, 20h          ; Insert space before time
         ret
 ;
-CRTIN1: call    L038            ;e674
-        mov     b, a
-        BIT     7,A
-        cnz     mapkpd
-        cpi     00h
-        JRZ     L031
+crtin1: call    kgetch          ; Get character from type-ahead buffer
+        mov     b, a            ; Save it
+        BIT     7,A             ; Top bit set? Then it could be keypad
+        cnz     mapkpd          ; Map keypad characters
+        cpi     00h             ; ^@ - Page on/off
+        JRZ     tglslk          ; Toggle scroll lock
         cpi     81h
-        JRZ     L032
+        JRZ     kmap81
         cpi     82h
-        JRZ     L033
+        JRZ     kmap82
         cpi     83h
-        JRZ     L034
+        JRZ     kmap83
         cpi     85h
-        JRZ     L035
+        JRZ     kmap85
         cpi     80h
         JRZ     break
-        JR      L037
-;
-L031:   lxi     h, B015        ;e697
-        mov     a, m
-        inr     a
-        ani     01h
-        mov     m, a
-        JR      L037
-L032:   mvi     b, 08h  ;e6a1
-        JR      L037
-L034:   mvi     b, 0bh  ;e6a5
-        JR      L037
-L033:   mvi     b, 06h  ;e6a9
-        JR      L037
-L035:   mvi     b, 0ah  ;e6ad
-        JR      L037
+        JR      crtinx
 ;;;
-break:  mvi     a, 0fh          ; Set time to 15 video frames
-        sta     brkctr          ; (~0.25 seconds)
+tglslk: lxi     h, scrlck       ; Address scroll lock
+        mov     a, m            ; Read it
+        inr     a               ; Step
+        ani     01h             ; Limit to 0/1 
+        mov     m, a            ; Update it
+        JR      crtinx
+;;; 
+kmap81: mvi     b, 08h          ; BS - backspace      - left ?
+        JR      crtinx
+kmap83: mvi     b, 0bh          ; VT - vertical tab   - down ?
+        JR      crtinx
+kmap82: mvi     b, 06h          ; ^F - cursor fowards - right ?
+        JR      crtinx
+kmap85: mvi     b, 0ah          ; LF - line feed      - down?
+        JR      crtinx
+;;;
+break:  mvi     a, BRKTIM       ; Time for break (in video frames)
+        sta     brkctr
         lda     MNCMD
         ori     08h             ; Set break bit
         out     MNSTAT
-L037:   mov     a, b    ;e6bd
+;;; Fall through to exit
+crtinx: mov     a, b            ; Recover saved character
         ret
-;;; CRTIN1
-L038:   lxi     h, BUFCNT ;e6bf
+;;;
+;;; Get character from type-ahead buffer
+kgetch: lxi     h, BUFCNT       ; Number of chracters in buffer
         di
-        dcr     m
+        dcr     m               ; Decrement it
         ei
-        lhld    W004
-        lxi     d, KBDBFE
+        lhld    kbrptr          ; Type-ahead read pointer
+        lxi     d, KBDBFE       ; End of buffer (+1)
         mov     a, l
-        cmp     e
-        JRNZ    L039
+        cmp     e               ; Compare low
+        JRNZ    kgetc1          ; Not past buffer end
         mov     a, h
-        cmp     d
-        JRNZ    L039
-        lxi     h, KBDBUF
-L039:   mov     a, m
-        inx     h
-        shld    W004
+        cmp     d               ; Compare high
+        JRNZ    kgetc1          ; Not past buffer end
+        lxi     h, KBDBUF       ; Loop to start of buffer
+kgetc1: mov     a, m            ; Get character
+        inx     h               ; Step pointer
+        shld    kbrptr          ; and save for next time
         ret
 ;
 mapkpd: push    b               ; Save character
@@ -479,7 +483,7 @@ mapkpx: ret
         db      0B8h
 kpdcds: db      0B9h
 ;;;
-CRTOU1: mov     b, c            ;1f84+offset
+crtou1: mov     b, c            ;1f84+offset
         mov     a, c
         cpi     1bh
         jz      L074
@@ -528,7 +532,7 @@ L044:   mov     m, a    ;e742
         ei
         call    L063
         ret
-;;; CRTOU1
+;;;
 L045:   lxi     h, vblnk         ;e75e
         mvi     d, 00h
         lda     W007H
@@ -536,7 +540,7 @@ L045:   lxi     h, vblnk         ;e75e
         dad     d
         ret
 ;
-L046:   lda     B015               ;e769
+L046:   lda     scrlck               ;e769
         ora     a
         rnz
         lda     TIMENB
@@ -592,7 +596,7 @@ L052:   call    L049            ;e7cc
         call    L045
         mvi     m, 0ffh
         ret
-;;; INIT1
+;;; init1
 ;;; Clear B bytes of video RAM to ASCII space
 ;;; D is MS byte of address in video RAM
 ;;; HL points at RAM in CPU2
@@ -670,7 +674,7 @@ tglclk: lxi     h, KEYCLK       ; Toggle key click
 ;;;
 rngbel: mvi     a, 0dh          ; PPIC[6] = 1 (Bell on)
         out     PPICW
-        mvi     a, 0fh          ; Bell duration
+        mvi     a, BELTIM       ; Bell duration
         sta     belctr
         ret
 ;;;
@@ -976,7 +980,7 @@ LX01:   inx     h
 ;;; d = track  number
 ;;; e = sector number
 ;;;
-DISK1:  shld    dskptr          ; Save data pointer (but this never used)
+disk1:  shld    dskptr          ; Save data pointer (but this never used)
         SSPD    DSKSTK
         lxi     sp, STACK3
         mov     a, b
