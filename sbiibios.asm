@@ -54,8 +54,8 @@ RTCSEC  EQU     32H             ; Seconds register in RTC
         ASEG
         ORG     PVBIOS
 ;;;
-W007:   dw      3745h           ;e400
-W007H   EQU     W007+1
+rowcol: dw      3745h           ;e400
+vidrow  EQU     rowcol+1
 CONSTK: dw      3545h           ;Save SP during console routines
 DSKSTK: dw      4443h           ;Save SP during disk routines
 INIT:   jmp     init1           ;e406
@@ -80,13 +80,13 @@ vblnk:  db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
 belctr: db      45h             ; Bell counter
 krptct: db      37h             ; Keyboard repeat counter
 B012:   db      00h             ;e44f 00
-B001:   DB      0               ;e450 00
-B002:   DB      32h             ;e451 32
+escst1: db      0               ;e450 00
+escst2: db      32h             ;e451 32
 B003:   DB      41h             ;e452 41
-B004:   DB      31h             ;e453 31
-B007:   DB      32h             ;e454 32
-vlinum: DB      43h             ;e455 43
-INTSTK: DW      3134h           ;Save SP during interrupts
+scncol: db      31h             ; Screen column
+scnrow: db      32h             ; Screen row
+vlinum: db      43h             ;e455 43
+INTSTK: dw      3134h           ;Save SP during interrupts
 dskptr: dw      0               ;e458 00 00
 B013:   db      0               ;e45a 00
 KBBUFF: db      0               ;replaces kbchar in os3bdos
@@ -126,7 +126,7 @@ L002:   mov     m, a            ; Clear byte in vblnkc
         dcr     b
         JRNZ    L002
 ;;;
-        sta     B001
+        sta     escst1
         sta     B003
         sta     BUFCNT
         lxi     h, KBDBUF
@@ -483,17 +483,17 @@ mapkpx: ret
         db      0B8h
 kpdcds: db      0B9h
 ;;;
-crtou1: mov     b, c            ;1f84+offset
+crtou1: mov     b, c
         mov     a, c
-        cpi     1bh
-        jz      L074
-        lda     B001
+        cpi     1bh             ; ESC ?
+        jz      crtesc
+        lda     escst1
         ora     a
-        jnz     L075
+        jnz     escprc          ; Process escape code
         lda     B003
         ora     a
         JRNZ    LX02
-        mov a, b
+        mov     a, b
 L042:   sui     20h             ;e719
         jm      L055
 LX02:   mov     a, b
@@ -535,7 +535,7 @@ L044:   mov     m, a    ;e742
 ;;;
 L045:   lxi     h, vblnk         ;e75e
         mvi     d, 00h
-        lda     W007H
+        lda     vidrow
         mov     e, a
         dad     d
         ret
@@ -574,23 +574,25 @@ L048:   di              ;e77c
         lxi     h, vblnk
         mvi     m, 0ffh
         ret
-;
-L049:   lda     W007H           ;e7b0
+;;;
+;;; Address video RAM by multiplying row number
+;;; by 80 (number of characters in row)
+vraddr: lda     vidrow           ; Pick up row number
         lxi     h, 0000h
-        lxi     d, 0050h
-        mvi     b, 08h          ; 8 characters at the start of screen RAM?
-L051:   rrc                     ;e7bb
-        JRNC    L050
-        dad     d
-L050:   SLAR    E
-        RALR    D               ;aka RL
-        dcr     b
-        JRNZ    L051
-        LDED    vtopsl
-        dad     d
+        lxi     d, 80           ; Length of row 
+        mvi     b, 08h          ; 8 bits in row number
+vradrl: rrc                     ; LSB set?
+        JRNC    vradr0
+        dad     d               ; Yes - add in (80 * 2^n)
+vradr0: SLAR    E               ; Shift DE right one place
+        RALR    D               ; (aka Z80 RLA instruction)
+        dcr     b               ; Decrement bit counter
+        JRNZ    vradrl          ; Loop over bits
+        LDED    vtopsl          ; Start of top row
+        dad     d               ; Add in (row * 80)
         ret
 ;
-L052:   call    L049            ;e7cc
+L052:   call    vraddr            ;e7cc
         mvi     b, 50h
         call    L003
         call    L045
@@ -660,7 +662,7 @@ L055:   mov     a, b    ;e80c
         ret
 ;
 L056:   lxi     h, 0000h
-        shld    W007
+        shld    rowcol
         lhld    vtopsl
         shld    vcursr
         ret
@@ -683,10 +685,10 @@ L059:   call    L063
         ani     07h
         JRNZ    L059
         ret
-L060:   call    L049
+L060:   call    vraddr
         shld    vcursr
         mvi     a, 00h
-        sta     W007
+        sta     rowcol
         ret
 L061:   lxi     h, TIMENB
         mov     a, m
@@ -698,11 +700,11 @@ L061:   lxi     h, TIMENB
         mvi     b, 0bh
         call    L003
         ret
-L062:   lda     W007H
+L062:   lda     vidrow
         ora     a
         rz
         dcr     a
-        sta     W007H
+        sta     vidrow
         lhld    vcursr
         lxi     d, 0ffb0h
         dad     d
@@ -712,7 +714,7 @@ L062:   lda     W007H
 L063:   lhld    vcursr           ;e89d
         inx     h
         shld    vcursr
-        lhld    W007
+        lhld    rowcol
         inr     l
         mov     a, l
         cpi     50h
@@ -727,19 +729,19 @@ L063:   lhld    vcursr           ;e89d
         JR      L067
 ;
 L068:   inr     h
-L067:   shld    W007
+L067:   shld    rowcol
         ret
 L064:   lhld    vcursr   ;e8c0 2a
         lxi     d, 0050h
         dad     d
         shld    vcursr
-        lda     w007H
+        lda     vidrow
         cpi     17h
         JRNZ    L069
         call    L046
         ret
 L069:   inr     a
-        sta     W007H
+        sta     vidrow
         ret
 L065:   lxi     h, vblnk ;e8da
         mvi     b, 18h
@@ -754,7 +756,7 @@ L070:   mov     m, a
         lxi     h, vblnk
         mvi     m, 0ffh
         ret
-L066:   lhld    W007
+L066:   lhld    rowcol
         mov     a, l
         ora     h
         rz
@@ -766,135 +768,141 @@ L066:   lhld    W007
         JR      L072
 ;
 L071:   dcr     l
-L072:   shld    W007
+L072:   shld    rowcol
         lhld    vcursr
         dcx     h
         shld    vcursr
         ret
 ;;;
-;;; Initialize video pointer
+;;; Initialize video pointers
 vinipt: lxi     h,0000h
-        shld    W007
+        shld    rowcol
         shld    vtopsc
         shld    vtopsl
         shld    vcursr
-        lxi     d, 0045h        ; 69 + 9 = 78 (_00:00:00__)
+        lxi     d, 0045h        ; 69 + 9 = 78 (_00:00:00..)
         dad     d
         shld    timpos
         ret
 ;
-L074:   mvi     a, 01h  ;e927
-        sta     B001
+crtesc: mvi     a, 01h
+        sta     escst1
         ret
 ;
-L075:   lda     B001    ;e92d
+escprc: lda     escst1          ; Escape state-machine state
         cpi     01h
-        JRZ     L076
+        JRZ     escone          ; Process escape
         cpi     02h
-        JRZ     L077
+        JRZ     esctwo
         cpi     03h
-        JRZ     L078
+        JRZ     escrow
         xra     a
-        sta     B001
+        sta     escst1
         ret
-;
-L076:   mov     a, b    ;e941
-        cpi     59h
-        JRZ     L079
-        cpi     3dh
-        JRZ     L079
-        cpi     7eh
-        JRZ     L080
-L083:   xra     a               ;e94eh
-        sta     B001
+;;;
+;;; First character after ESC
+escone: mov     a, b            ; Recover character
+        cpi     'Y'
+        JRZ     escsy           ; Record ESC Y
+        cpi     '='
+        JRZ     escsy           ; Record ESC Y
+        cpi     '~'
+        JRZ     escstl          ; Record ESC ~
+escbad: xra     a               ; Clear escst1
+        sta     escst1
         ret
-;
-L079:   xra     a       ;e953
-        sta     B002
-L081:   mvi     a, 02h
-        sta     B001
+;;;
+;;; ESC Y or ESC = received
+escsy: xra     a
+        sta     escst2          ; Clear escst2
+esc1x:  mvi     a, 02h
+        sta     escst1
         ret
-L080:   mvi     a, 0ffh  ;e95d
-        sta     B002
-        JR      L081
-;
-L077:   lda     B002   ;e964
+escstl: mvi     a, 0ffh         ; Set escst2
+        sta     escst2
+        JR      esc1x
+;;;
+esctwo: lda     escst2   ;e964
         ora     a
-        JRNZ    L082
-        mov     a, b
-        sui     20h
+        JRNZ    esctld
+;;; Here for ESC Y ? or ESC = ?
+        mov     a, b            ; Recover character
+        sui     20h             ; Subtract ' '
         mov     c, a
-        jm      L083
-        sui     18h
-        jp      L083
+        jm      escbad
+        sui     18h             ; Off-by-one bug?
+        jp      escbad          ; Not expecting beyond bottom of screen
         mov     a, c
-        sta     B007
-        mvi     a, 03h
-        sta     B001
+        sta     scnrow          ; Save screen row
+        mvi     a, 03h          ; Set to expect column byte
+        sta     escst1
         ret
-L078:   mov     a, b    ;e980
-        sui     20h
+;;;
+escrow: mov     a, b            ; Recover character
+        sui     20h             ; Subtract ' '
         mov     c, a
-        jm      L083
-        sui     70h
-        jp      L083
+        jm      escbad          ; Not expecting control characters
+        sui     70h             ; This looks like a bug - should be 79
+        jp      escbad          ; Not expecting beyond right of screen
         mov     a, c
-        sta     B004
-        xra     a
-        sta     B001
-        lhld    B004
-        shld    W007
-        call    L049
-        xchg
-        lhld    W007
-        mvi     h, 00h
-        dad     d
-        shld    vcursr
+        sta     scncol
+        xra     a               ; Clear escape state
+        sta     escst1          ; the sequence is complete
+        lhld    scncol          ; Pick up ESC row-col pair
+        shld    rowcol          ; Save in row-col
+        call    vraddr          ; Address in video RAM
+        xchg                    ; to DE reg
+        lhld    rowcol          ; Get row-col
+        mvi     h, 00h          ; but only the column
+        dad     d               ; Add in RAM address
+        shld    vcursr          ; Save updated cursor position
         ret
-L082:   xra     a           ;e9a8
-        sta     B001
+;;; 
+;;; ESC ~ ?
+esctld: xra     a               ; Clear ESC state
+        sta     escst1          ; sequence is complete
         mov     a, b
         lxi     h, B013
-        cpi     52h
+        cpi     'R'
         JRZ     L084
-        cpi     72h
+        cpi     'r'
         JRZ     L085
-        cpi     48h
+        cpi     'H'
         JRZ     L086
-        cpi     68h
+        cpi     'h'
         JRZ     L087
-        cpi     42h
+        cpi     'B'
         JRZ     L088
-        cpi     62h
+        cpi     'b'
         JRZ     L089
-        cpi     4eh
+        cpi     'N'
         JRZ     L092
-        cpi     55h
+        cpi     'U'
         JRZ     L090
-        cpi     75h
+        cpi     'u'
         JRZ     L091
         lxi     h, B012
-        cpi     73h
+        cpi     's'
         JRZ     L093
-        cpi     53h
+        cpi     'S'
         JRZ     L094
         lxi     h, prta
-        cpi     67h
+        cpi     'g'
         JRZ     L095
-        cpi     47h
+        cpi     'G'
         JRZ     L096
-        cpi     41h
+        cpi     'A'
         JRZ     L097
-        cpi     61h
+        cpi     'a'
         JRZ     L098
         lxi     h, B003
-        cpi     45h
+        cpi     'E'
         JRZ     L099
-        cpi     44h
+        cpi     'D'
         JRZ     L100
-        cpi     4bh
+        cpi     'K'
         JRZ     L101
-        cpi     6bh
+        cpi     'k'
         JRZ     L102
         ret
 L084:   SETB    0, M
@@ -941,8 +949,8 @@ L099:   mvi     m, 0ffh          ;ea41
 L100:   mvi     m, 00h          ;ea44
         ret
 ;;;
-L101:   call    L049            ;ea47
-        lda     W007
+L101:   call    vraddr            ;ea47
+        lda     rowcol
         lxi     b, 0000h
         mov     c, a
         dad     b
@@ -954,7 +962,7 @@ L101:   call    L049            ;ea47
 ;
 L102:   call    L101            ;ea5a
         call    L045
-        lda     W007H
+        lda     vidrow
         cpi     17h
         rz
         mov     b, a
