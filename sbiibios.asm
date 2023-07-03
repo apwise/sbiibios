@@ -55,6 +55,7 @@ RTCSEC  EQU     32H             ; Seconds register in RTC
         ORG     PVBIOS
 ;;;
 rowcol: dw      3745h           ;e400
+vidcol  EQU     rowcol
 vidrow  EQU     rowcol+1
 CONSTK: dw      3545h           ;Save SP during console routines
 DSKSTK: dw      4443h           ;Save SP during disk routines
@@ -66,30 +67,30 @@ vcursr: dw      0000h           ;e412
 vtopsc: dw      0000h           ; Copy of vtopsl for this frame
 vtopsl: dw      0000h           ; Video top select
 B009:   db      00h             ;e418
-vblnkp: dw      0000h           ;e419
-;;; Copy of vblnk used (in interrupt routine) during video frame
-vblnkc: db      39h, 33h, 45h, 30h, 41h, 0dh, 0ah, 3ah
+vrwenp: dw      0000h           ;e419
+;;; Copy of vrwen used (in interrupt routine) during video frame
+vrwenc: db      39h, 33h, 45h, 30h, 41h, 0dh, 0ah, 3ah
         db      31h, 38h, 45h, 37h, 31h, 35h, 30h, 30h
         db      30h, 44h, 44h, 33h, 36h, 42h, 33h, 45h
         db      30h
-;;; Video blanking - 1 byte per row of video
-vblnk:  db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
+;;; Video row enables - 1 byte per row of video
+vrwen:  db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
         db      39h, 43h, 44h, 45h, 45h, 45h, 36h, 37h
         db      44h, 45h, 36h, 30h, 37h, 43h, 32h, 31h
         db      45h
 belctr: db      45h             ; Bell counter
 krptct: db      37h             ; Keyboard repeat counter
-B012:   db      00h             ;e44f 00
-escst1: db      0               ;e450 00
-escst2: db      32h             ;e451 32
-B003:   DB      41h             ;e452 41
+vchset: db      00h             ; Select alternate character set
+escst1: db      0               ; Escape state-machine state 1
+escst2: db      32h             ; Escape state-machine state 2
+vtrans: DB      41h             ; Transparanet mode - display control characters
 scncol: db      31h             ; Screen column
 scnrow: db      32h             ; Screen row
 vlinum: db      43h             ;e455 43
-INTSTK: dw      3134h           ;Save SP during interrupts
+INTSTK: dw      3134h           ; Save SP during interrupts
 dskptr: dw      0               ;e458 00 00
-B013:   db      0               ;e45a 00
-KBBUFF: db      0               ;replaces kbchar in os3bdos
+vidatr: db      0               ; Video attribute byte
+KBBUFF: db      0               ;... replaces kbchar in os3bdos
 brkctr: db      43h             ; Main port break time counter
 BUFCNT: db      0               ;e45d 00
 scrlck: db      0               ; Scroll lock XXXX keep as DB - not initialized
@@ -114,20 +115,20 @@ init1:  di
         call    L001
         call    vinipt
 ;;;
-;;; Clear video blanking buffers
-        lxi     h, vblnkc
-        lxi     d, vblnk
+;;; Clear video row-enable buffers
+        lxi     h, vrwenc
+        lxi     d, vrwen
         mvi     b, LPF          ; LPF bytes - 1 per line
         xra     a
-L002:   mov     m, a            ; Clear byte in vblnkc
-        stax    d               ; Clear byte in vblnk
+L002:   mov     m, a            ; Clear byte in vrwenc
+        stax    d               ; Clear byte in vrwen
         inx     h               ; increment pointers
         inx     d
         dcr     b
         JRNZ    L002
 ;;;
         sta     escst1
-        sta     B003
+        sta     vtrans
         sta     BUFCNT
         lxi     h, KBDBUF
         shld    kbwptr
@@ -199,21 +200,21 @@ intrpx: in      INTRST
         ei
         RETI
 ;
-ihsync: call    vsetbl          ; Set blanking for the next row
+ihsync: call    vseten          ; Set blanking for the next row
         lxi     h, vlinum
         inr     m               ; Step line number
         JR      intrpx
 ;;;
 ivsync: call    vidpts          ; Send video pointers to controller
 ;;;
-        lxi     h, vblnk        ; Copy array from vblnk to vblnkc
-        lxi     d, vblnkc
+        lxi     h, vrwen        ; Copy array from vrwen to vrwenc
+        lxi     d, vrwenc
         lxi     b, LPF          ; 24 bytes (but there are 25 allocated?)
         LDIR
 ;;;
-        lxi     h, vblnkc       ; Start of (copy of) blanking array
-        shld    vblnkp          ; Initialize pointer for the frame
-        call    vsetbl          ; Set blanking for the first row
+        lxi     h, vrwenc       ; Start of (copy of) blanking array
+        shld    vrwenp          ; Initialize pointer for the frame
+        call    vseten          ; Set blanking for the first row
         call    rtcdpy          ; Display time on screen
 ;;;
         lda     belctr          ; Decrement bell counter
@@ -349,17 +350,17 @@ kbstb1: mov     m, b            ; Store character in buffer
 ;
 kbfull: jmp     rngbel          ; Ring bell - keyboard buffer full
 ;;;
-vsetbl: lhld    vblnkp          ; Point into vblnkc array
+vseten: lhld    vrwenp          ; Point into vrwenc array
         mov     a, m            ; Pick up flag for current line
         inx     h               ; Step pointer
-        shld    vblnkp          ; Save for next line
+        shld    vrwenp          ; Save for next line
         ora     a               ; Test flag
-        JRZ     vblnkr
+        JRZ     vrwbln
         mvi     a, 02h          ; PPIC[1] = 0 Display video row
         out     PPICW
         ret
 ;
-vblnkr: mvi     a, 03h          ; PPIC[1] = 1 Blank video row
+vrwbln: mvi     a, 03h          ; PPIC[1] = 1 Blank video row
         out     PPICW
         ret
 ;
@@ -485,59 +486,60 @@ kpdcds: db      0B9h
 ;;;
 crtou1: mov     b, c
         mov     a, c
-        cpi     1bh             ; ESC ?
-        jz      crtesc
-        lda     escst1
+        cpi     1bh             ; ESC
+        jz      crtesc          ; Process escape code
+        lda     escst1          ; ESC state-machine active?
         ora     a
-        jnz     escprc          ; Process escape code
-        lda     B003
+        jnz     escprc          ; Yes, process escape code
+        lda     vtrans          ; Transparent mode?
         ora     a
-        JRNZ    LX02
-        mov     a, b
-L042:   sui     20h             ;e719
-        jm      L055
-LX02:   mov     a, b
-        call    L043
+        JRNZ    LX02            ; Yes - display even if a control code
+        mov     a, b            ; Recover character
+L042:   sui     20h             ; Less than 20h?
+        jm      L055            ; Yes, process as a control code
+LX02:   mov     a, b            ; Recover character
+        call    vdsply          ; Display character
         ret
 ;
-L043:   ani     7fh             ;e723
-        sta     B009
-        call    L045
-        mov     a, m
+vdsply: ani     7fh             ; Lose top bit
+        sta     B009            ; Save
+        call    vablnk          ; Address vrwen array
+        mov     a, m            ; Is it enabled?
         ora     a
-        cz      L052
+        cz      vclrow          ; No, clear row then enable it
         lhld    vcursr
-        mov     a, h
-        ori     0f8h
+        mov     a, h            ; Get cursor address
+        ori     0f8h            ; Force pointer into video RAM
         mov     h, a
-        lda     B012
+        lda     vchset          ; Alternate character set?
         ora     a
-        lda     B009
-        JRZ     L044
-        ori     80h
-L044:   mov     m, a    ;e742
-        di
-        lda     prta
-        ani     0dfh
+        lda     B009            ; Recover character to display
+        JRZ     vdspl1          ; Not alternate set
+        ori     80h             ; Alternate set - set top bit
+vdspl1: mov     m, a            ; Put character in video RAM
+        di                      ; Can't be interrupted
+        lda     prta            ;   while addressing attribute RAM
+        ani     0dfh            ; PRTA[5] = 0 - Address attribute
         out     PPIA
-        EXAF
-        mov     a, h
-        ani     4fh
+        EXAF                    ; Save port-a value
+        mov     a, h            ; Force address to be
+        ani     4fh             ;   4800h to 4fffh
         mov     h, a
-        lda     B013
-        mov     m, a
-        EXAF
-        ori     20h
+        lda     vidatr          ; Get video attribute value
+        mov     m, a            ; store into attribute RAM
+        EXAF                    ; Recover port-a value
+        ori     20h             ; PRTA[5] = 1 - Address DRAM
         out     PPIA
-        ei
+        ei                      ; Enable interrupts
         call    L063
         ret
 ;;;
-L045:   lxi     h, vblnk         ;e75e
+;;;  Address vrwen array
+vablnk: lxi     h, vrwen        ; Start of vrwen
         mvi     d, 00h
         lda     vidrow
-        mov     e, a
-        dad     d
+        mov     e, a            ; DE = which row
+        dad     d               ; HL now points at correct row blank flag
         ret
 ;
 L046:   lda     scrlck               ;e769
@@ -557,27 +559,27 @@ L048:   di              ;e77c
         lhld    timpos
         dad     d
         shld    timpos
-        lxi     h, vblnk+1
-        lxi     d, vblnk
+        lxi     h, vrwen+1
+        lxi     d, vrwen
         lxi     b, 0017h
         LDIR
         xra     a
         stax    d
         ei
-        lxi     h, vblnk
+        lxi     h, vrwen
         mov     a, m
         ora     a
         rnz
         mvi     b, 50h          ; Line length
         lhld    vtopsl           ; e416 must store address in screen CPU2 RAM
         call    L003            ; clear it (and in CPU2 RAM)
-        lxi     h, vblnk
+        lxi     h, vrwen
         mvi     m, 0ffh
         ret
 ;;;
 ;;; Address video RAM by multiplying row number
 ;;; by 80 (number of characters in row)
-vraddr: lda     vidrow           ; Pick up row number
+vraddr: lda     vidrow          ; Pick up row number
         lxi     h, 0000h
         lxi     d, 80           ; Length of row 
         mvi     b, 08h          ; 8 bits in row number
@@ -590,13 +592,15 @@ vradr0: SLAR    E               ; Shift DE right one place
         JRNZ    vradrl          ; Loop over bits
         LDED    vtopsl          ; Start of top row
         dad     d               ; Add in (row * 80)
-        ret
-;
-L052:   call    vraddr            ;e7cc
-        mvi     b, 50h
-        call    L003
-        call    L045
-        mvi     m, 0ffh
+        ret                             ;
+;;;
+;;; Actually clear the row in video RAM and clear
+;;; the vrwen flag for the row so the row is displayed
+vclrow: call    vraddr          ; Address the RAM for this row
+        mvi     b, 80           ; Number to clear
+        call    L003            ; Clear the row
+        call    vablnk          ; Address the vrwen array
+        mvi     m, 0ffh         ; and set to display the row
         ret
 ;;; init1
 ;;; Clear B bytes of video RAM to ASCII space
@@ -710,27 +714,28 @@ L062:   lda     vidrow
         dad     d
         shld    vcursr
         ret
-;;; CRTOUT
-L063:   lhld    vcursr           ;e89d
-        inx     h
+;;; Step cursor?
+L063:   lhld    vcursr          ; Step cursor
+        inx     h               ; Increment cursor address
         shld    vcursr
-        lhld    rowcol
-        inr     l
+        lhld    rowcol          ; Get row-col
+        inr     l               ; Increment column
         mov     a, l
-        cpi     50h
-        JRNZ    L067
-        mvi     l, 00h
-        mov     a, h
-        cpi     17h
-        JRNZ    L068
+        cpi     80              ; Past end of line?
+        JRNZ    L067            ; No, still in the same line
+        mvi     l, 00h          ; Clear column
+        mov     a, h            ; Get row
+        cpi     23              ;   last row?
+        JRNZ    L068            ; No, go inrement row
         push    h
         call    L046
         pop     h
         JR      L067
 ;
-L068:   inr     h
-L067:   shld    rowcol
+L068:   inr     h               ; Increment row
+L067:   shld    rowcol          ; Update row-col
         ret
+;;; 
 L064:   lhld    vcursr   ;e8c0 2a
         lxi     d, 0050h
         dad     d
@@ -743,7 +748,7 @@ L064:   lhld    vcursr   ;e8c0 2a
 L069:   inr     a
         sta     vidrow
         ret
-L065:   lxi     h, vblnk ;e8da
+L065:   lxi     h, vrwen ;e8da
         mvi     b, 18h
         xra     a
 L070:   mov     m, a
@@ -753,7 +758,7 @@ L070:   mov     m, a
         lxi     h, 0000h
         mvi     b, 50h
         call    L003
-        lxi     h, vblnk
+        lxi     h, vrwen
         mvi     m, 0ffh
         ret
 L066:   lhld    rowcol
@@ -862,106 +867,107 @@ escrow: mov     a, b            ; Recover character
 esctld: xra     a               ; Clear ESC state
         sta     escst1          ; sequence is complete
         mov     a, b
-        lxi     h, B013
+        lxi     h, vidatr       ; Point at video attribute byte
         cpi     'R'
-        JRZ     L084
+        JRZ     vrevon
         cpi     'r'
-        JRZ     L085
+        JRZ     vrevof
         cpi     'H'
-        JRZ     L086
+        JRZ     vhlfon
         cpi     'h'
-        JRZ     L087
+        JRZ     vhlfof
         cpi     'B'
-        JRZ     L088
+        JRZ     vblkon
         cpi     'b'
-        JRZ     L089
+        JRZ     vblkof
         cpi     'N'
-        JRZ     L092
+        JRZ     vatrnm
         cpi     'U'
-        JRZ     L090
+        JRZ     vundon
         cpi     'u'
-        JRZ     L091
-        lxi     h, B012
+        JRZ     vundof
+        lxi     h, vchset
         cpi     's'
-        JRZ     L093
+        JRZ     vchrev
         cpi     'S'
-        JRZ     L094
+        JRZ     vchnrm
         lxi     h, prta
         cpi     'g'
-        JRZ     L095
+        JRZ     vwaltc
         cpi     'G'
-        JRZ     L096
+        JRZ     vwnrmc
         cpi     'A'
-        JRZ     L097
+        JRZ     vwnonr
         cpi     'a'
-        JRZ     L098
-        lxi     h, B003
+        JRZ     vwrevv
+        lxi     h, vtrans
         cpi     'E'
-        JRZ     L099
+        JRZ     vtrnon
         cpi     'D'
-        JRZ     L100
+        JRZ     vtrnof
         cpi     'K'
-        JRZ     L101
+        JRZ     vclrer
         cpi     'k'
-        JRZ     L102
+        JRZ     vclres
         ret
-L084:   SETB    0, M
+vrevon: SETB    0, M            ; Reverse video on
         ret
-L085:   RES     0, M
+vrevof: RES     0, M            ; Reverse video off
         ret
-L086:   SETB    1, M
+vhlfon: SETB    1, M            ; Half intensity on
         ret
-L087:   RES     1, M
+vhlfof: RES     1, M            ; Half intensity off
         ret
-L088:   SETB    2, M
+vblkon: SETB    2, M            ; Blinking on
         ret
-L089:   RES     2, M
+vblkof: RES     2, M            ; Blinking off
         ret
-L090:   SETB    3, M
+vundon: SETB    3, M            ; Underline on
         ret
-L091:   RES     3, M
+vundof: RES     3, M            ; Underline off
         ret
-L092:   xra     a                       ;ea1e
-        sta     B013
+vatrnm: xra     a               ; Normalize - all attributes off
+        sta     vidatr
         ret
-L093:   mvi     m, 00h                  ;ea23
+vchrev: mvi     m, 00h          ; Primary and secondary sets as normal
         ret
-L094:   mvi     m, 0ffh                  ;ea26
+vchnrm: mvi     m, 0ffh         ; Reverse primary and secondar char. sets
         ret
-L095:   SETB    0, M
+vwaltc: SETB    0, M            ; Whole screen alternate character set
         mov     a, m
         out     PPIA
         ret
-L096:   RES     0, M
+vwnrmc: RES     0, M            ; Whole screen normal character set
         mov     a, m
-        out     68h
+        out     PPIA
         ret
-L097:   RES     7, M
+vwnonr: RES     7, M            ; Whole screen non-reverse video
         mov     a, m
-        out     68h
+        out     PPIA
         ret
-L098:   SETB    7, M
+vwrevv: SETB    7, M            ; Whole screen reverse video
         mov     a, m
-        out     68h
+        out     PPIA
         ret
-L099:   mvi     m, 0ffh          ;ea41
+vtrnon: mvi     m, 0ffh         ; Transparent mode on (display control characters)
         ret
-L100:   mvi     m, 00h          ;ea44
+vtrnof: mvi     m, 00h          ; Disable transparent mode
         ret
 ;;;
-L101:   call    vraddr            ;ea47
-        lda     rowcol
+;;; Clear to end of row
+vclrer: call    vraddr          ; Address of start of current row
+        lda     vidcol
         lxi     b, 0000h
         mov     c, a
-        dad     b
-        mvi     a, 50h
+        dad     b               ; Compute address of current character
+        mvi     a, 80
         sub     c
-        mov     b, a
+        mov     b, a            ; Number of characters to clear
         call    L003
         ret
 ;
-L102:   call    L101            ;ea5a
-        call    L045
+vclres: call    vclrer          ; Clear to end of screen
+        call    vablnk
         lda     vidrow
         cpi     17h
         rz
