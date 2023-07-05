@@ -55,20 +55,20 @@ RTCSEC  EQU     32H             ; Seconds register in RTC
         ASEG
         ORG     PVBIOS
 ;;;
-rowcol: dw      3745h           ;e400
-vidcol  EQU     rowcol
-vidrow  EQU     rowcol+1
-CONSTK: dw      3545h           ;Save SP during console routines
-DSKSTK: dw      4443h           ;Save SP during disk routines
-INIT:   jmp     init1           ;e406
-CRTIN:  jmp     crtin1          ;e409
-CRTOUT: jmp     crtou1          ;e40c
-DISK:   jmp     disk1           ;e40f
-vcursr: dw      0000h           ;e412
+rowcol: dw      3745h           ; Row and column as a 16-bit value
+vidcol  EQU     rowcol          ; Low byte is column
+vidrow  EQU     rowcol+1        ; High byte is row
+CONSTK: dw      3545h           ; Save SP during console routines
+DSKSTK: dw      4443h           ; Save SP during disk routines
+INIT:   jmp     init1           ; Jump to initialize
+CRTIN:  jmp     crtin1          ; Jump to console input
+CRTOUT: jmp     crtou1          ; Jump to console output
+DISK:   jmp     disk1           ; Jump to disk routine
+vcursr: dw      0000h           ; Video cursor address
 vtopsc: dw      0000h           ; Copy of vtopsl for this frame
 vtopsl: dw      0000h           ; Video top select
 vidchr: db      00h             ; Character being sent to screen
-vrwenp: dw      0000h           ;e419
+vrwenp: dw      0000h           ; Pointer into vrwenc
 ;;; Copy of vrwen used (in interrupt routine) during video frame
 vrwenc: db      39h, 33h, 45h, 30h, 41h, 0dh, 0ah, 3ah
         db      31h, 38h, 45h, 37h, 31h, 35h, 30h, 30h
@@ -87,9 +87,9 @@ escst2: db      32h             ; Escape state-machine state 2
 vtrans: DB      41h             ; Transparanet mode - display control characters
 scncol: db      31h             ; Screen column
 scnrow: db      32h             ; Screen row
-vlinum: db      43h             ;e455 43
+vlinum: db      43h             ; Video line number in interrupt routine
 INTSTK: dw      3134h           ; Save SP during interrupts
-dskptr: dw      0               ;e458 00 00
+dskptr: dw      0               ; Save disk data pointer (but unused)
 vidatr: db      0               ; Video attribute byte
 KBBUFF: db      0               ;... replaces kbchar in os3bdos
 brkctr: db      43h             ; Main port break time counter
@@ -647,36 +647,36 @@ vidcl2: mov     a, h
         ret
 ;
 vidctl: mov     a, b
-        cpi     01h             ; SOH - Home cursor
-        JRZ     L056
-        cpi     02h             ; STX - Toggle Key-clock
+        cpi     01h             ; CTRL-A - Home cursor
+        JRZ     vhmcrs
+        cpi     02h             ; CTRL-B - Toggle Key-clock
         JRZ     tglclk
-        cpi     07h             ; BEL - Ring Bell
+        cpi     07h             ; CTRL-G - Ring Bell
         JRZ     rngbel
-        cpi     09h             ; HT  - Tab
-        JRZ     L059
+        cpi     09h             ; CTRL-I - Tab
+        JRZ     vhtab
         cpi     0dh             ; CR
-        JRZ     L060
-        cpi     14h             ; DC4
-        JRZ     L061
-        cpi     0bh             ; VT  - Cursor up
-        JRZ     L062
-        cpi     06h             ; ACK - Cursor forwards
+        JRZ     vcret
+        cpi     14h             ; CTRL-T - Toggle time display
+        JRZ     vtgltm
+        cpi     0bh             ; CTRL-K - Cursor up
+        JRZ     vcrsup
+        cpi     06h             ; CTRL-F - Cursor forwards
         JRZ     stpcrs
-        cpi     0ah             ; LF  - Cursor down
-        jz      L064
-        cpi     0ch             ; FF  - Clear screen
-        jz      L065
-        cpi     15h             ; NAK -
-        jz      L066
-        cpi     08h             ; BS
-        jz      L066
+        cpi     0ah             ; LF/CTRL-J - (Cursor down)
+        jz      vlfeed
+        cpi     0ch             ; CTRL-L - Clear screen
+        jz      vclear
+        cpi     15h             ; CTRL-U - Cursor left
+        jz      vcrslf
+        cpi     08h             ; BS/CTRL-H - Cursor left
+        jz      vcrslf
         ret
 ;
-L056:   lxi     h, 0000h
-        shld    rowcol
-        lhld    vtopsl
-        shld    vcursr
+vhmcrs: lxi     h, 0000h        ; Home cursor
+        shld    rowcol          ; Set row/col to zeros
+        lhld    vtopsl          ; Get current top row
+        shld    vcursr          ; Write to cursor position
         ret
 ;;;
 tglclk: lxi     h, KEYCLK       ; Toggle key click
@@ -692,35 +692,38 @@ rngbel: mvi     a, 0dh          ; PPIC[6] = 1 (Bell on)
         sta     belctr
         ret
 ;;;
-L059:   call    stpcrs
-        mov     a, l
-        ani     07h
-        JRNZ    L059
+vhtab:  call    stpcrs          ; Step cursor
+        mov     a, l            ; Is horizontal position
+        ani     07h             ; divisible by 8?
+        JRNZ    vhtab           ; No, step again
         ret
-L060:   call    vraddr
-        shld    vcursr
-        mvi     a, 00h
-        sta     rowcol
+;;; 
+vcret:  call    vraddr          ; Carriage return
+        shld    vcursr          ; Cursor to the left of current row
+        mvi     a, 00h          ; Set column to zero
+        sta     vidcol
         ret
-L061:   lxi     h, TIMENB
+;;;
+vtgltm: lxi     h, TIMENB       ; Toggle time enable
         mov     a, m
-        inr     a
-        ani     01h
+        inr     a               ; Flip bottom bit
+        ani     01h             ; Lose higher bits
         mov     m, a
-        rnz
-        lhld    timpos
-        mvi     b, 0bh
+        rnz                     ; Return if now enabled
+        lhld    timpos          ; If now disabled, clear the time
+        mvi     b, 11           ; display (11 characters to end of line)
         call    vidclr
         ret
-L062:   lda     vidrow
-        ora     a
-        rz
-        dcr     a
-        sta     vidrow
-        lhld    vcursr
-        lxi     d, 0ffb0h
-        dad     d
-        shld    vcursr
+;;; 
+vcrsup: lda     vidrow          ; Cursor up
+        ora     a               ; Already on top row?
+        rz                      ; Yes, return
+        dcr     a               ; No, decrement
+        sta     vidrow          ; and update row
+        lhld    vcursr          ; Cursor address
+        lxi     d, 0ffb0h       ; -80
+        dad     d               ; Subtract 80
+        shld    vcursr          ; and update
         ret
 ;;; 
 ;;; Step cursor?
@@ -745,47 +748,51 @@ stpcr1: inr     h               ; Increment row
 stpcr2: shld    rowcol          ; Update row-col
         ret
 ;;; 
-L064:   lhld    vcursr
-        lxi     d, 0050h
-        dad     d
-        shld    vcursr
-        lda     vidrow
-        cpi     17h
-        JRNZ    L069
-        call    scroll
+vlfeed: lhld    vcursr          ; Cursor address
+        lxi     d, CPR          ; Characters per row
+        dad     d               ; Add
+        shld    vcursr          ; Update cursor
+        lda     vidrow          ; Current row
+        cpi     LPF-1           ; On bottom row?
+        JRNZ    vlfd1           ; No
+        call    scroll          ; Yes, scroll screen
         ret
-L069:   inr     a
-        sta     vidrow
+;;; 
+vlfd1:  inr     a               ; Step row
+        sta     vidrow          ; and update
         ret
-L065:   lxi     h, vrwen ;e8da
-        mvi     b, 18h
+;;; 
+vclear: lxi     h, vrwen        ; Clear the video row-enable array
+        mvi     b, LPF          ; Number of entries
         xra     a
-L070:   mov     m, a
+vclr1:  mov     m, a
         inx     h
-        DJNZ    L070
-        call    vinipt
-        lxi     h, 0000h
-        mvi     b, 50h
-        call    vidclr
-        lxi     h, vrwen
-        mvi     m, 0ffh
+        DJNZ    vclr1           ; Loop over array
+;;;
+        call    vinipt          ; Initialise video pointers
+        lxi     h, 0000h        ; Clear the first line
+        mvi     b, CPR          ; All 80 characters
+        call    vidclr          ; Go clear it
+        lxi     h, vrwen        ; Enable
+        mvi     m, 0ffh         ;  the first row
         ret
-L066:   lhld    rowcol
-        mov     a, l
+;;; 
+vcrslf: lhld    rowcol          ; Get row/col
+        mov     a, l            ; are they both zero?
         ora     h
-        rz
-        mov     a, l
-        ora     a
-        JRNZ    L071
-        mvi     l, 4fh
-        dcr     h
-        JR      L072
+        rz                      ; Yes - return
+        mov     a, l            ; Get column
+        ora     a               ; Zero (already at left?)
+        JRNZ    vcrsl1          ; No
+        mvi     l, CPR-1        ; Yes, move to right screen edge column
+        dcr     h               ; and up one line
+        JR      vcrsl2
 ;
-L071:   dcr     l
-L072:   shld    rowcol
-        lhld    vcursr
-        dcx     h
-        shld    vcursr
+vcrsl1: dcr     l               ; Not in left column, decrment
+vcrsl2: shld    rowcol          ; Store update row/col
+        lhld    vcursr          ; Cursor address
+        dcx     h               ; Decrement
+        shld    vcursr          ; and update
         ret
 ;;;
 ;;; Initialize video pointers
@@ -836,7 +843,7 @@ escstl: mvi     a, 0ffh         ; Set escst2
         sta     escst2
         JR      esc1x
 ;;;
-esctwo: lda     escst2   ;e964
+esctwo: lda     escst2          ; Get state variable
         ora     a
         JRNZ    esctld
 ;;; Here for ESC Y ? or ESC = ?
@@ -966,7 +973,7 @@ vtrnof: mvi     m, 00h          ; Disable transparent mode
 ;;; Clear to end of row
 vclrer: call    vraddr          ; Address of start of current row
         lda     vidcol
-        lxi     b, 0000h
+        lxi     b, 0
         mov     c, a
         dad     b               ; Compute address of current character
         mvi     a, CPR
@@ -976,32 +983,34 @@ vclrer: call    vraddr          ; Address of start of current row
         ret
 ;
 vclres: call    vclrer          ; Clear to end of screen
-        call    varwen
-        lda     vidrow
-        cpi     17h
-        rz
-        mov     b, a
-        mvi     a, 17h
-        sub     b
-        mov     c, a
+        call    varwen          ; Address row enable array
+        lda     vidrow          ; Current row
+        cpi     LPF-1           ; Last row?
+        rz                      ; Yes, return
+        mov     b, a            ; Save current row
+        mvi     a, LPF-1        ; Number of rows minus 1
+        sub     b               ; Number that need clearing
+        mov     c, a            ; Loop counter
         xra     a
-LX01:   inx     h
-        mov     m, a
-        dcr     c
-        JRNZ    LX01
+vclre1: inx     h               ; Step vrwen pointer
+        mov     m, a            ; Blank that row
+        dcr     c               ; Step counter
+        JRNZ    vclre1          ; Loop until done
         ret
 ;;;
-;;; Enter with something in HL - pointer to data?
-;;; Something in b - seems to be
-;;;  0,4 - Restore
-;;;  1 - Read
-;;;  2 - Write with    RAW verification
-;;;  5 - format
-;;;  6 - Write without RAW verification
+;;; Disk routine
+;;; 
+;;; Command in b:
+;;;   0,4 - Restore
+;;;   1   - Read
+;;;   2   - Write with    RAW verification
+;;;   5   - format
+;;;   6   - Write without RAW verification
 ;;;
-;;; c = disk   number
-;;; d = track  number
-;;; e = sector number
+;;; c  = disk   number
+;;; d  = track  number
+;;; e  = sector number
+;;; hl = data pointer (but never used)
 ;;;
 disk1:  shld    dskptr          ; Save data pointer (but this never used)
         SSPD    DSKSTK
@@ -1070,7 +1079,7 @@ fparam: call    busopn          ; Send params
         call    buscls
         ret
 ;
-hst2fp: lxi     h, HSTBUF        ;eae6
+hst2fp: lxi     h, HSTBUF       ; Copy host buffer to CPU2
         call    busopn
         lxi     d, FPYBUF
         lxi     b, PHYSEC
@@ -1078,7 +1087,7 @@ hst2fp: lxi     h, HSTBUF        ;eae6
         call    buscls
         ret
 ;
-fp2hst: call    busopn            ;eaf8
+fp2hst: call    busopn          ; Copy CPU2 to host buffer
         lxi     d, HSTBUF
         lxi     h, FPYBUF
         lxi     b, PHYSEC
@@ -1086,7 +1095,7 @@ fp2hst: call    busopn            ;eaf8
         call    buscls
         ret
 ;
-fpstat: call    busopn            ;eb0a
+fpstat: call    busopn          ; Get CPU2 status
         lda     FPYSTS
         push    psw
         call    buscls
