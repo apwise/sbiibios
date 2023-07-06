@@ -1,75 +1,93 @@
-; file offset is c780
+match   EQU     1
         MACLIB  Z80
-OFFSET  EQU     9400H           ;OFFSET FOR 64K = 9400H
-                                ;OFFSET FOR 32K = 1400H
-HSTBUF  EQU     6200H+OFFSET    ;DMA DISK BUFFER
-STACK   EQU     5FFFH+OFFSET    ;STACK WHEN LOADING
-STACK1  EQU     5FDFH+OFFSET    ;STACK DURING INTERRUPT
-STACK2  EQU     5FBFH+OFFSET    ;STACK DURING CONOUT; DISK ROUTINES
-STACK3  EQU     5F9FH+OFFSET
-DIRBUF  EQU     5E80H+OFFSET    ;128 BYTES FOR DISK DIRECTORY
-KBDBUF  EQU     5F00H+OFFSET    ;128 BYTE KEYBOARD BUFFER
-KBDBFE  EQU     5F80H+OFFSET    ;END OF KEYBOARD BUFFER (BOTTOM OF STACK3)
-CONFIG  EQU     5B00H+OFFSET    ;Configuration table read from disk
-MNCMD   EQU     CONFIG+2        ;MAIN PORT COMMAND BYTE
-FREQ    EQU     CONFIG+5        ;4BH=60HZ, 0BH=50H
-prta    EQU     FREQ            ; also maintains current PPIA value
-TIMENB  EQU     CONFIG+8        ;00 = TIME FUNCTION DISABLED; FF = TIME ENABLED
-SYNC    EQU     CONFIG+9        ;Sync byte
-KEYCLK  EQU     CONFIG+10       ;Handshake byte
-KEYPAD  EQU     CONFIG+14       ;
-PVBIOS: EQU     5000H+OFFSET    ;START OF PRIVATE BIOS MODULE
-;TIME    EQU     0042H           ;TIME ( IN ASCII )
-;DATE    EQU     004BH           ;DATE ( BCD )
-;
+;;;
+OFFSET  EQU     9400h           ; OFFSET for 64K = 9400h
+                                ; OFFSET for 32K = 1400h
+HSTBUF  EQU     6200h + OFFSET  ; DMA disk buffer
+STACK   EQU     5fffh + OFFSET  ; Stack when loading
+STACK1  EQU     5fdfh + OFFSET  ; Stack during interrupt
+STACK2  EQU     5fbfh + OFFSET  ; Stack during conout
+STACK3  EQU     5f9fh + OFFSET  ; Stack during disk routines
+DIRBUF  EQU     5e80h + OFFSET  ; 128 bytes for disk directory
+KBDBUF  EQU     5f00h + OFFSET  ; 128 byte keyboard buffer
+KBDBFE  EQU     5f80h + OFFSET  ; End of keyboard buffer (bottom of STACK3)
+;;;
+CONFIG  EQU     5b00h + OFFSET  ; Configuration table read from disk
+BAUD    EQU     CONFIG          ; For main and aux ports
+MNMODE  EQU     CONFIG+1        ; Main port mode        
+MNCMD   EQU     CONFIG+2        ; Main port command byte
+AUXMOD  EQU     CONFIG+3        ; Aux port mode
+AUXCMD  EQU     CONFIG+4        ; Aux port command byte
+FREQ    EQU     CONFIG+5        ; 4bh=60Hz, 0bh=50Hz
+prta    EQU     FREQ            ;   also maintains current PPIA value
+HDSHAK  EQU     CONFIG+6        ; 00 = DSR disabled; 01 = DSR enabled
+RAW     EQU     CONFIG+7        ; 00 = No disk read verify; ff = Read verify
+TIMENB  EQU     CONFIG+8        ; 00 = Time function disabled; ff = Time enabled
+SYNC    EQU     CONFIG+9        ; Sync byte
+KEYCLK  EQU     CONFIG+10       ; Handshake byte
+KEYPAD  EQU     CONFIG+14       ; Keypad mapping table (18 bytes)
+;;;
+PVBIOS: EQU     5000H+OFFSET    ; Start of this private BIOS module
+;;;
+;;; Locations in CPU-2 RAM concerned with floppy disks
+;;; 
 FPYPRM  EQU     8802h           ; 4-byte parameter block
 FPYCMD  EQU     8807h           ; Command byte (FF = "go")
 FPYBUF  EQU     8808h           ; 512-byte sector buffer
 FPYSTS  EQU     8a0bh           ; Returned status byte
 PHYSEC  EQU     0200h           ; Physical sector size (512 bytes)
-;
-;TABLE OF EQUATES--I/O DEVICES
-;
-AUXDAT  EQU     40H             ; AUX PORT DATA
-AUXST   EQU     41H             ; AUX PORT STATUS
-INTRST  EQU     48H             ; RESET INTERRUPT LATCH
-KBCHAR  EQU     50H             ; KEYBOARD CHARACTER
-MNDAT   EQU     58H             ; MAIN PORT DATA
-MNSTAT  EQU     59H             ; MAIN PORT STATUS
-BDGEN   EQU     60H             ; BAUD RATE GENERATOR
-PPIA    EQU     68H             ; 8255 PORT A
-PPIB    EQU     69H             ; 8255 PORT B
-PPIC    EQU     6AH             ; 8255 PORT C
-PPICW   EQU     6BH             ; 8255 CONTROL PORT
-TOPSEL  EQU     02H             ; CRTC TOP OF PAGE REGISTER
-ROWSTR  EQU     01H             ; CRTC ROW START REGISTER
-CURSOR  EQU     03H             ; CRTC CURSOR REGISTER
-BELTIM  EQU     15              ; BELL TIME LOOP
-KEYDLY  EQU     40              ; KEY DELAY BEFORE REPEAT
-RPTTIM  EQU      1              ; KEY REPEAT TIME LOOP
-BRKTIM  EQU     15              ; 250 MILLISEC BREAK TIME FOR COMM PORT
-LPF     EQU     24              ; NO. OF ROWS ON CRT
+;;;
+;;; Table of equates--I/O devices
+;;;
+RTCSEC  EQU     32h             ; Seconds register in RTC
+AUXDAT  EQU     40h             ; Aux port data
+AUXST   EQU     41h             ; Aux port status
+INTRST  EQU     48h             ; Reset interrupt latch
+KBCHAR  EQU     50h             ; Keyboard character
+MNDAT   EQU     58h             ; Main port data
+MNSTAT  EQU     59h             ; Main port status
+BDGEN   EQU     60h             ; Baud rate generator
+PPIA    EQU     68h             ; 8255 port a
+PPIB    EQU     69h             ; 8255 port b
+PPIC    EQU     6ah             ; 8255 port c
+PPICW   EQU     6bh             ; 8255 control port
+TOPSEL  EQU     02h             ; CRTC top of page register
+ROWSTR  EQU     01h             ; CRTC row start register
+CURSOR  EQU     03h             ; CRTC cursor register
+BELTIM  EQU     15              ; Bell time loop
+KEYDLY  EQU     40              ; Key delay before repeat
+RPTTIM  EQU      1              ; Key repeat time loop
+BRKTIM  EQU     15              ; 250 millisec break time for comm port
+LPF     EQU     24              ; No. of rows on crt
 CPR     EQU     80              ; No. of chars per row
-RTCSEC  EQU     32H             ; Seconds register in RTC
 ;
         ASEG
         ORG     PVBIOS
 ;;;
+        if      match
 rowcol: dw      3745h           ; Row and column as a 16-bit value
 vidcol  EQU     rowcol          ; Low byte is column
 vidrow  EQU     rowcol+1        ; High byte is row
 CONSTK: dw      3545h           ; Save SP during console routines
 DSKSTK: dw      4443h           ; Save SP during disk routines
+        endif
+        if      NOT match
+rowcol: ds      2               ; Row and column as a 16-bit value
+vidcol  EQU     rowcol          ; Low byte is column
+vidrow  EQU     rowcol+1        ; High byte is row
+CONSTK: ds      2               ; Save SP during console routines
+DSKSTK: ds      2               ; Save SP during disk routines
+        endif
 INIT:   jmp     init1           ; Jump to initialize
 CRTIN:  jmp     crtin1          ; Jump to console input
 CRTOUT: jmp     crtou1          ; Jump to console output
 DISK:   jmp     disk1           ; Jump to disk routine
-vcursr: dw      0000h           ; Video cursor address
-vtopsc: dw      0000h           ; Copy of vtopsl for this frame
-vtopsl: dw      0000h           ; Video top select
-vidchr: db      00h             ; Character being sent to screen
-vrwenp: dw      0000h           ; Pointer into vrwenc
-;;; Copy of vrwen used (in interrupt routine) during video frame
+vcursr: ds      2               ; Video cursor address
+vtopsc: ds      2               ; Copy of vtopsl for this frame
+vtopsl: ds      2               ; Video top select
+vidchr: ds      1               ; Character being sent to screen
+vrwenp: ds      2               ; Pointer into vrwenc
+        if      match
 vrwenc: db      39h, 33h, 45h, 30h, 41h, 0dh, 0ah, 3ah
         db      31h, 38h, 45h, 37h, 31h, 35h, 30h, 30h
         db      30h, 44h, 44h, 33h, 36h, 42h, 33h, 45h
@@ -81,29 +99,54 @@ vrwen:  db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
         db      45h
 belctr: db      45h             ; Bell counter
 krptct: db      37h             ; Keyboard repeat counter
-vchset: db      00h             ; Select alternate character set
-escst1: db      0               ; Escape state-machine state 1
+        endif
+        if      NOT match
+;;; Copy of vrwen used (in interrupt routine) during video frame
+vrwenc: ds      CPR + 1
+;;; Video row enables - 1 byte per row of video
+vrwen:  ds      CPR + 1
+belctr: db      0               ; Bell counter
+krptct: db      0               ; Keyboard repeat counter
+        endif
+vchset: ds      1               ; Select alternate character set
+escst1: ds      1               ; Escape state-machine state 1
+        if      match
 escst2: db      32h             ; Escape state-machine state 2
-vtrans: DB      41h             ; Transparanet mode - display control characters
+vtrans: db      41h             ; Transparanet mode - display control characters
 scncol: db      31h             ; Screen column
 scnrow: db      32h             ; Screen row
 vlinum: db      43h             ; Video line number in interrupt routine
 INTSTK: dw      3134h           ; Save SP during interrupts
-dskptr: dw      0               ; Save disk data pointer (but unused)
-vidatr: db      0               ; Video attribute byte
-KBBUFF: db      0               ;... replaces kbchar in os3bdos
+        endif
+        if      NOT match
+escst2: ds      1               ; Escape state-machine state 2
+vtrans: ds      1               ; Transparanet mode - display control characters
+scncol: ds      1               ; Screen column
+scnrow: ds      1               ; Screen row
+vlinum: ds      1               ; Video line number in interrupt routine
+INTSTK: ds      2               ; Save SP during interrupts
+        endif
+dskptr: ds      2               ; Save disk data pointer (but unused)
+vidatr: ds      1               ; Video attribute byte
+KBBUFF: db      0               ; ... replaces kbchar in os3bdos
+        if      match
 brkctr: db      43h             ; Main port break time counter
-BUFCNT: db      0               ;e45d 00
-scrlck: db      0               ; Scroll lock XXXX keep as DB - not initialized
-kbwptr: dw      0               ; type-ahead buffer write pointer
-kbrptr: dw      0               ; type-ahead buffer read pointer
-timpsc: dw      0               ; Copy of timpos for current frame
-timpos: dw      0               ; Position tor time display on top line
+        endif
+        if      NOT match
+brkctr: db      0               ; Main port break time counter
+        endif
+BUFCNT: ds      1               ; No. of chars in KBDBUF
+scrlck: db      0               ; Scroll lock
+kbwptr: ds      2               ; Type-ahead buffer write pointer
+kbrptr: ds      2               ; Type-ahead buffer read pointer
+timpsc: ds      2               ; Copy of timpos for current frame
+timpos: ds      2               ; Position tor time display on top line
 ;;;
 ;;; Initialization
 init1:  di
         lda     prta            ; Initialize 50Hz/60Hz
         out     PPIA
+;;;
 ;;; Set up interrupt vector
         mvi     a, 0c3h
         sta     0038h           ; JMP opcode
@@ -113,8 +156,8 @@ init1:  di
         mvi     a, 0eh          ; PPIC[7] = 0
         out     PPICW           ; New keyboard char ack.
 ;;;
-        call    iniser
-        call    vinipt
+        call    iniser          ; Initialise serial ports
+        call    vinipt          ; Initialise video pointers
 ;;;
 ;;; Clear video row-enable buffers
         lxi     h, vrwenc
@@ -145,6 +188,7 @@ init2:  mov     m, a            ; Clear byte in vrwenc
         ret
 ;;;
 ;;; Initialize serial ports
+;;;
 iniser: lxi     h, CONFIG       ; Point at CONFIG structure
         mov     a, m            ; BAUD
         out     BDGEN           ; and program baud generator
@@ -265,6 +309,7 @@ vidpts: lhld    timpos          ; Take copy of time display position
         ret
 ;;;
 ;;; Service the keyboard (called from vertical sync interrupt)
+;;;
 keysrv: in      PPIB            ; Get port B
         mov     c, a            ; Save
         ani     02h             ; Any key (still) down?
@@ -478,6 +523,7 @@ mapkpd: push    b               ; Save character
         JR      mapkpx
 notkpd: pop     b               ; Recover unchanged code
 mapkpx: ret
+;;; 
 ;;; Table of keypad key-codes
         db      081h, 082h, 083h, 085h
         db      08Dh, 0ACh, 0ADh, 0AEh
@@ -582,7 +628,9 @@ scrol2: di                      ; No interrupts while updating
         ret
 ;;;
 ;;; Address video RAM by multiplying row number
-;;; by 80 (number of characters in row)
+;;; by 80 (number of characters in row) and add the
+;;; current vtopsl (top of screen) pointer
+;;;
 vraddr: lda     vidrow          ; Pick up row number
         lxi     h, 0000h
         lxi     d, CPR          ; Length of row 
@@ -600,16 +648,18 @@ vradr0: SLAR    E               ; Shift DE right one place
 ;;;
 ;;; Actually clear the row in video RAM and clear
 ;;; the vrwen flag for the row so the row is displayed
+;;;
 vclrow: call    vraddr          ; Address the RAM for this row
         mvi     b, CPR          ; Number to clear
         call    vidclr            ; Clear the row
         call    varwen          ; Address the vrwen array
         mvi     m, 0ffh         ; and set to display the row
         ret
-;;; init1
+;;;
 ;;; Clear B bytes of video RAM to ASCII space
 ;;; D is MS byte of address in video RAM
-;;; HL points within video RAM
+;;; HL points at start character in video RAM
+;;;
 vidclr: mov     c, b            ; Save B
         mvi     d, 0f8h
         push    h
@@ -726,7 +776,8 @@ vcrsup: lda     vidrow          ; Cursor up
         shld    vcursr          ; and update
         ret
 ;;; 
-;;; Step cursor?
+;;; Step cursor
+;;;
 stpcrs: lhld    vcursr          ; Step cursor
         inx     h               ; Increment cursor address
         shld    vcursr
@@ -971,6 +1022,7 @@ vtrnof: mvi     m, 00h          ; Disable transparent mode
         ret
 ;;;
 ;;; Clear to end of row
+;;; 
 vclrer: call    vraddr          ; Address of start of current row
         lda     vidcol
         lxi     b, 0
@@ -1079,7 +1131,7 @@ fparam: call    busopn          ; Send params
         call    buscls
         ret
 ;
-hst2fp: lxi     h, HSTBUF       ; Copy host buffer to CPU2
+hst2fp: lxi     h, HSTBUF       ; Copy host buffer to CPU-2
         call    busopn
         lxi     d, FPYBUF
         lxi     b, PHYSEC
@@ -1087,7 +1139,7 @@ hst2fp: lxi     h, HSTBUF       ; Copy host buffer to CPU2
         call    buscls
         ret
 ;
-fp2hst: call    busopn          ; Copy CPU2 to host buffer
+fp2hst: call    busopn          ; Copy CPU-2 to host buffer
         lxi     d, HSTBUF
         lxi     h, FPYBUF
         lxi     b, PHYSEC
@@ -1095,26 +1147,26 @@ fp2hst: call    busopn          ; Copy CPU2 to host buffer
         call    buscls
         ret
 ;
-fpstat: call    busopn          ; Get CPU2 status
+fpstat: call    busopn          ; Get CPU-2 status
         lda     FPYSTS
         push    psw
         call    buscls
         pop     psw
         ret
 ;
-busopn: mvi     a, 0ah          ;PPIC[5] Low
+busopn: mvi     a, 0ah          ; PPIC[5] Low
         out     PPICW
 busbsy: in      PPIB            ; Wait for CPU2
         ral                     ; not busy
         JRC     busbsy
-        mvi     a, 08h          ;PPIC[4] Low
+        mvi     a, 08h          ; PPIC[4] Low
         out     PPICW
         ret
 ;
-buscls: mvi     a, 09h          ;PPIC[4] High
+buscls: mvi     a, 09h          ; PPIC[4] High
         out     PPICW
         mvi     a, 0bh
-        out     PPICW           ;PPIC[5] High
+        out     PPICW           ; PPIC[5] High
         ret
 ;
         end
