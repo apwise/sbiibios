@@ -1,6 +1,6 @@
 xmatch  EQU     1
         MACLIB  Z80
-;;;
+;
 OFFSET  EQU     9400h           ; OFFSET for 64K = 9400h
                                 ; OFFSET for 32K = 1400h
 HSTBUF  EQU     6200h + OFFSET  ; DMA disk buffer
@@ -11,7 +11,7 @@ STACK3  EQU     5f9fh + OFFSET  ; Stack during disk routines
 DIRBUF  EQU     5e80h + OFFSET  ; 128 bytes for disk directory
 KBDBUF  EQU     5f00h + OFFSET  ; 128 byte keyboard buffer
 KBDBFE  EQU     5f80h + OFFSET  ; End of keyboard buffer (bottom of STACK3)
-;;;
+;
 CONFIG  EQU     5b00h + OFFSET  ; Configuration table read from disk
 BAUD    EQU     CONFIG          ; For main and aux ports
 MNMODE  EQU     CONFIG+1        ; Main port mode        
@@ -26,19 +26,19 @@ TIMENB  EQU     CONFIG+8        ; 00 = Time function disabled; ff = Time enabled
 SYNC    EQU     CONFIG+9        ; Sync byte
 KEYCLK  EQU     CONFIG+10       ; Handshake byte
 KEYPAD  EQU     CONFIG+14       ; Keypad mapping table (18 bytes)
-;;;
+;
 PVBIOS: EQU     5000H+OFFSET    ; Start of this private BIOS module
-;;;
-;;; Locations in CPU-2 RAM concerned with floppy disks
-;;; 
+;
+; Locations in CPU-2 RAM concerned with floppy disks
+; 
 FPYPRM  EQU     8802h           ; 4-byte parameter block
 FPYCMD  EQU     8807h           ; Command byte (FF = "go")
 FPYBUF  EQU     8808h           ; 512-byte sector buffer
 FPYSTS  EQU     8a0bh           ; Returned status byte
 PHYSEC  EQU     0200h           ; Physical sector size (512 bytes)
-;;;
-;;; Table of equates--I/O devices
-;;;
+;
+; Table of equates--I/O devices
+;
 RTCSEC  EQU     32h             ; Seconds register in RTC
 AUXDAT  EQU     40h             ; Aux port data
 AUXST   EQU     41h             ; Aux port status
@@ -75,9 +75,10 @@ BRKTIM  EQU     15              ; 250 millisec break time for comm port
 LPF     EQU     24              ; No. of rows on crt
 CPR     EQU     80              ; No. of chars per row
 ;
+;
         ASEG
         ORG     PVBIOS
-;;;
+;
         if      xmatch
 rowcol: dw      3745h           ; Row and column as a 16-bit value
 vidcol  EQU     rowcol          ; Low byte is column
@@ -106,7 +107,7 @@ vrwenc: db      39h, 33h, 45h, 30h, 41h, 0dh, 0ah, 3ah
         db      31h, 38h, 45h, 37h, 31h, 35h, 30h, 30h
         db      30h, 44h, 44h, 33h, 36h, 42h, 33h, 45h
         db      30h
-;;; Video row enables - 1 byte per row of video
+; Video row enables - 1 byte per row of video
 vrwen:  db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
         db      39h, 43h, 44h, 45h, 45h, 45h, 36h, 37h
         db      44h, 45h, 36h, 30h, 37h, 43h, 32h, 31h
@@ -115,9 +116,9 @@ belctr: db      45h             ; Bell counter
 krptct: db      37h             ; Keyboard repeat counter
         endif
         if      NOT xmatch
-;;; Copy of vrwen used (in interrupt routine) during video frame
+; Copy of vrwen used (in interrupt routine) during video frame
 vrwenc: ds      CPR + 1
-;;; Video row enables - 1 byte per row of video
+; Video row enables - 1 byte per row of video
 vrwen:  ds      CPR + 1
 belctr: db      0               ; Bell counter
 krptct: db      0               ; Keyboard repeat counter
@@ -155,25 +156,25 @@ kbwptr: ds      2               ; Type-ahead buffer write pointer
 kbrptr: ds      2               ; Type-ahead buffer read pointer
 timpsc: ds      2               ; Copy of timpos for current frame
 timpos: ds      2               ; Position tor time display on top line
-;;;
-;;; Initialization
+;
+; Initialization
 init1:  di
         lda     prta            ; Initialize 50Hz/60Hz
         out     PPIA
-;;;
-;;; Set up interrupt vector
+;
+; Set up interrupt vector
         mvi     a, 0c3h
         sta     0038h           ; JMP opcode
         lxi     h, INTRP
         shld    0039h           ; Address of interrupt routine
-;;;
+;
         mvi     a, 0eh          ; PPIC[7] = 0
         out     PPICW           ; New keyboard char ack.
-;;;
+;
         call    iniser          ; Initialise serial ports
         call    vinipt          ; Initialise video pointers
-;;;
-;;; Clear video row-enable buffers
+;
+; Clear video row-enable buffers
         lxi     h, vrwenc
         lxi     d, vrwen
         mvi     b, LPF          ; LPF bytes - 1 per line
@@ -184,7 +185,7 @@ init2:  mov     m, a            ; Clear byte in vrwenc
         inx     d
         dcr     b
         JRNZ    init2
-;;;
+;
         sta     escst1
         sta     vtrans
         sta     BUFCNT
@@ -200,9 +201,9 @@ init2:  mov     m, a            ; Clear byte in vrwenc
         IM1
         ei
         ret
-;;;
-;;; Initialize serial ports
-;;;
+;
+; Initialize serial ports
+;
 iniser: lxi     h, CONFIG       ; Point at CONFIG structure
         mov     a, m            ; BAUD
         out     BDGEN           ; and program baud generator
@@ -247,7 +248,7 @@ INTRP:  SSPD    INTSTK
         in      PPIB
         ani     04h             ; Vertical sync?
         JRZ     ihsync
-;;; Vertical sync
+; Vertical sync
         call    ivsync
         lxi     h, vlinum
         mvi     m, 00h          ; Clear line number
@@ -264,19 +265,19 @@ ihsync: call    vseten          ; Set blanking for the next row
         lxi     h, vlinum
         inr     m               ; Step line number
         JR      intrpx
-;;;
+;
 ivsync: call    vidpts          ; Send video pointers to controller
-;;;
+;
         lxi     h, vrwen        ; Copy array from vrwen to vrwenc
         lxi     d, vrwenc
         lxi     b, LPF          ; 24 bytes (but there are 25 allocated?)
         LDIR
-;;;
+;
         lxi     h, vrwenc       ; Start of (copy of) blanking array
         shld    vrwenp          ; Initialize pointer for the frame
         call    vseten          ; Set blanking for the first row
         call    rtcdpy          ; Display time on screen
-;;;
+;
         lda     belctr          ; Decrement bell counter
         dcr     a
         sta     belctr
@@ -301,14 +302,14 @@ vidpts: lhld    timpos          ; Take copy of time display position
         shld    vtopsc
         xchg
         lhld    vcursr          ; Cursor position
-;;;
+;
         mov     a, h
         ani     0fh             ; Limit to 12-bit address (but why not 11-bit since it's 2K?)
         mov     h, a
         mov     a, d
         ani     0fh
         mov     d, a
-;;;
+;
         mvi     a, 01h          ; PPIC[0] = 1 swap addr and data buses
         out     PPICW
         mvi     a, CURSOR
@@ -321,9 +322,9 @@ vidpts: lhld    timpos          ; Take copy of time display position
         mvi     a, 00h          ; PPIC[0] = 0 - addr/data bus back to normal
         out     PPICW
         ret
-;;;
-;;; Service the keyboard (called from vertical sync interrupt)
-;;;
+;
+; Service the keyboard (called from vertical sync interrupt)
+;
 keysrv: in      PPIB            ; Get port B
         mov     c, a            ; Save
         ani     02h             ; Any key (still) down?
@@ -410,7 +411,7 @@ kbstb1: mov     m, b            ; Store character in buffer
         ret
 ;
 kbfull: jmp     rngbel          ; Ring bell - keyboard buffer full
-;;;
+;
 vseten: lhld    vrwenp          ; Point into vrwenc array
         mov     a, m            ; Pick up flag for current line
         inx     h               ; Step pointer
@@ -444,7 +445,7 @@ rtcrdl: INP     A               ; Read RTC register
         JRNZ    rtcasc          ; yes
         dcr     d               ; No - decrement try counter
         jnz     rtcrdl
-;;; Timeout
+; Timeout
         xra     a
         sta     TIMENB          ; Clear time display enable
         ret
@@ -479,14 +480,14 @@ crtin1: call    kgetch          ; Get character from type-ahead buffer
         cpi     80h
         JRZ     break
         JR      crtinx
-;;;
+;
 tglslk: lxi     h, scrlck       ; Address scroll lock
         mov     a, m            ; Read it
         inr     a               ; Step
         ani     01h             ; Limit to 0/1 
         mov     m, a            ; Update it
         JR      crtinx
-;;; 
+; 
 kmap81: mvi     b, 08h          ; BS - backspace      - left ?
         JR      crtinx
 kmap83: mvi     b, 0bh          ; VT - vertical tab   - down ?
@@ -495,17 +496,17 @@ kmap82: mvi     b, 06h          ; ^F - cursor fowards - right ?
         JR      crtinx
 kmap85: mvi     b, 0ah          ; LF - line feed      - down?
         JR      crtinx
-;;;
+;
 break:  mvi     a, BRKTIM       ; Time for break (in video frames)
         sta     brkctr
         lda     MNCMD
         ori     08h             ; Set break bit
         out     MNSTAT
-;;; Fall through to exit
+; Fall through to exit
 crtinx: mov     a, b            ; Recover saved character
         ret
-;;;
-;;; Get character from type-ahead buffer
+;
+; Get character from type-ahead buffer
 kgetch: lxi     h, BUFCNT       ; Number of chracters in buffer
         di
         dcr     m               ; Decrement it
@@ -537,15 +538,15 @@ mapkpd: push    b               ; Save character
         JR      mapkpx
 notkpd: pop     b               ; Recover unchanged code
 mapkpx: ret
-;;; 
-;;; Table of keypad key-codes
+; 
+; Table of keypad key-codes
         db      081h, 082h, 083h, 085h
         db      08Dh, 0ACh, 0ADh, 0AEh
         db      0B0h, 0B1h, 0B2h, 0B3h
         db      0B4h, 0B5h, 0B6h, 0B7h
         db      0B8h
 kpdcds: db      0B9h
-;;;
+;
 crtou1: mov     b, c
         mov     a, c
         cpi     1bh             ; ESC
@@ -595,8 +596,8 @@ vdspl1: mov     m, a            ; Put character in video RAM
         ei                      ; Enable interrupts
         call    stpcrs
         ret
-;;;
-;;;  Address vrwen (row enables) array
+;
+;  Address vrwen (row enables) array
 varwen: lxi     h, vrwen        ; Start of vrwen
         mvi     d, 00h
         lda     vidrow
@@ -610,11 +611,11 @@ scroll: lda     scrlck          ; Scroll-lock ?
         lda     TIMENB          ; Time displayed?
         ora     a
         JRZ     scrol2
-;;;
+;
 scrol1: lda     vlinum          ; Is this dead code?
         sui     15h
         jp      scrol1          ; Result is unused
-;;; 
+; 
 scrol2: di                      ; No interrupts while updating
         lhld    vtopsl          ; Get pointer top of sceen
         lxi     d, CPR          ; Add row length
@@ -640,11 +641,11 @@ scrol2: di                      ; No interrupts while updating
         lxi     h, vrwen
         mvi     m, 0ffh         ; and enable its display
         ret
-;;;
-;;; Address video RAM by multiplying row number
-;;; by 80 (number of characters in row) and add the
-;;; current vtopsl (top of screen) pointer
-;;;
+;
+; Address video RAM by multiplying row number
+; by 80 (number of characters in row) and add the
+; current vtopsl (top of screen) pointer
+;
 vraddr: lda     vidrow          ; Pick up row number
         lxi     h, 0000h
         lxi     d, CPR          ; Length of row 
@@ -659,32 +660,32 @@ vradr0: SLAR    E               ; Shift DE right one place
         LDED    vtopsl          ; Start of top row
         dad     d               ; Add in (row * 80)
         ret                             ;
-;;;
-;;; Actually clear the row in video RAM and clear
-;;; the vrwen flag for the row so the row is displayed
-;;;
+;
+; Actually clear the row in video RAM and clear
+; the vrwen flag for the row so the row is displayed
+;
 vclrow: call    vraddr          ; Address the RAM for this row
         mvi     b, CPR          ; Number to clear
         call    vidclr            ; Clear the row
         call    varwen          ; Address the vrwen array
         mvi     m, 0ffh         ; and set to display the row
         ret
-;;;
-;;; Clear B bytes of video RAM to ASCII space
-;;; D is MS byte of address in video RAM
-;;; HL points at start character in video RAM
-;;;
+;
+; Clear B bytes of video RAM to ASCII space
+; D is MS byte of address in video RAM
+; HL points at start character in video RAM
+;
 vidclr: mov     c, b            ; Save B
         mvi     d, 0f8h
         push    h
-;;; Clear video RAM
+; Clear video RAM
 vidcl1  mov     a, d
         ora     h               ; Address in video RAM
         mov     h, a
         mvi     m, ' '          ; Save space character
         inx     h
         DJNZ    vidcl1
-;;; 
+; 
         pop     h
         di                      ; No interrupts while
         lda     prta            ; updating attribute RAM
@@ -693,7 +694,7 @@ vidcl1  mov     a, d
         out     PPIA
         ei
         mov     b, c            ; Recover B
-;;; Clear attribute RAM
+; Clear attribute RAM
 vidcl2: mov     a, h
         ani     4fh             ; Force address to be
         ori     48h             ;  4800h to 4fffh
@@ -701,7 +702,7 @@ vidcl2: mov     a, h
         mvi     m, 00h          ; Clear attribute
         inx     h
         DJNZ    vidcl2
-;;;
+;
         di
         lda     prta
         ori     20h             ; PRTA[5] = 1 - Address DRAM
@@ -742,32 +743,32 @@ vhmcrs: lxi     h, 0000h        ; Home cursor
         lhld    vtopsl          ; Get current top row
         shld    vcursr          ; Write to cursor position
         ret
-;;;
+;
 tglclk: lxi     h, KEYCLK       ; Toggle key click
         mov     a, m
         inr     a
         ani     01h
         mov     m, a
         ret
-;;;
+;
 rngbel: mvi     a, 0dh          ; PPIC[6] = 1 (Bell on)
         out     PPICW
         mvi     a, BELTIM       ; Bell duration
         sta     belctr
         ret
-;;;
+;
 vhtab:  call    stpcrs          ; Step cursor
         mov     a, l            ; Is horizontal position
         ani     07h             ; divisible by 8?
         JRNZ    vhtab           ; No, step again
         ret
-;;; 
+; 
 vcret:  call    vraddr          ; Carriage return
         shld    vcursr          ; Cursor to the left of current row
         mvi     a, 00h          ; Set column to zero
         sta     vidcol
         ret
-;;;
+;
 vtgltm: lxi     h, TIMENB       ; Toggle time enable
         mov     a, m
         inr     a               ; Flip bottom bit
@@ -778,7 +779,7 @@ vtgltm: lxi     h, TIMENB       ; Toggle time enable
         mvi     b, 11           ; display (11 characters to end of line)
         call    vidclr
         ret
-;;; 
+; 
 vcrsup: lda     vidrow          ; Cursor up
         ora     a               ; Already on top row?
         rz                      ; Yes, return
@@ -789,9 +790,9 @@ vcrsup: lda     vidrow          ; Cursor up
         dad     d               ; Subtract 80
         shld    vcursr          ; and update
         ret
-;;; 
-;;; Step cursor
-;;;
+; 
+; Step cursor
+;
 stpcrs: lhld    vcursr          ; Step cursor
         inx     h               ; Increment cursor address
         shld    vcursr
@@ -812,7 +813,7 @@ stpcrs: lhld    vcursr          ; Step cursor
 stpcr1: inr     h               ; Increment row
 stpcr2: shld    rowcol          ; Update row-col
         ret
-;;; 
+; 
 vlfeed: lhld    vcursr          ; Cursor address
         lxi     d, CPR          ; Characters per row
         dad     d               ; Add
@@ -822,18 +823,18 @@ vlfeed: lhld    vcursr          ; Cursor address
         JRNZ    vlfd1           ; No
         call    scroll          ; Yes, scroll screen
         ret
-;;; 
+; 
 vlfd1:  inr     a               ; Step row
         sta     vidrow          ; and update
         ret
-;;; 
+; 
 vclear: lxi     h, vrwen        ; Clear the video row-enable array
         mvi     b, LPF          ; Number of entries
         xra     a
 vclr1:  mov     m, a
         inx     h
         DJNZ    vclr1           ; Loop over array
-;;;
+;
         call    vinipt          ; Initialise video pointers
         lxi     h, 0000h        ; Clear the first line
         mvi     b, CPR          ; All 80 characters
@@ -841,7 +842,7 @@ vclr1:  mov     m, a
         lxi     h, vrwen        ; Enable
         mvi     m, 0ffh         ;  the first row
         ret
-;;; 
+; 
 vcrslf: lhld    rowcol          ; Get row/col
         mov     a, l            ; are they both zero?
         ora     h
@@ -859,8 +860,8 @@ vcrsl2: shld    rowcol          ; Store update row/col
         dcx     h               ; Decrement
         shld    vcursr          ; and update
         ret
-;;;
-;;; Initialize video pointers
+;
+; Initialize video pointers
 vinipt: lxi     h,0000h
         shld    rowcol
         shld    vtopsc
@@ -885,8 +886,8 @@ escprc: lda     escst1          ; Escape state-machine state
         xra     a
         sta     escst1
         ret
-;;;
-;;; First character after ESC
+;
+; First character after ESC
 escone: mov     a, b            ; Recover character
         cpi     'Y'
         JRZ     escsy           ; Record ESC Y
@@ -897,8 +898,8 @@ escone: mov     a, b            ; Recover character
 escbad: xra     a               ; Clear escst1
         sta     escst1
         ret
-;;;
-;;; ESC Y or ESC = received
+;
+; ESC Y or ESC = received
 escsy: xra     a
         sta     escst2          ; Clear escst2
 esc1x:  mvi     a, 02h
@@ -907,11 +908,11 @@ esc1x:  mvi     a, 02h
 escstl: mvi     a, 0ffh         ; Set escst2
         sta     escst2
         JR      esc1x
-;;;
+;
 esctwo: lda     escst2          ; Get state variable
         ora     a
         JRNZ    esctld
-;;; Here for ESC Y ? or ESC = ?
+; Here for ESC Y ? or ESC = ?
         mov     a, b            ; Recover character
         sui     20h             ; Subtract ' '
         mov     c, a
@@ -923,7 +924,7 @@ esctwo: lda     escst2          ; Get state variable
         mvi     a, 03h          ; Set to expect column byte
         sta     escst1
         ret
-;;;
+;
 escrow: mov     a, b            ; Recover character
         sui     20h             ; Subtract ' '
         mov     c, a
@@ -943,8 +944,8 @@ escrow: mov     a, b            ; Recover character
         dad     d               ; Add in RAM address
         shld    vcursr          ; Save updated cursor position
         ret
-;;; 
-;;; ESC ~ ?
+; 
+; ESC ~ ?
 esctld: xra     a               ; Clear ESC state
         sta     escst1          ; sequence is complete
         mov     a, b
@@ -1034,9 +1035,9 @@ vtrnon: mvi     m, 0ffh         ; Transparent mode on (display control character
         ret
 vtrnof: mvi     m, 00h          ; Disable transparent mode
         ret
-;;;
-;;; Clear to end of row
-;;; 
+;
+; Clear to end of row
+; 
 vclrer: call    vraddr          ; Address of start of current row
         lda     vidcol
         lxi     b, 0
@@ -1063,21 +1064,21 @@ vclre1: inx     h               ; Step vrwen pointer
         dcr     c               ; Step counter
         JRNZ    vclre1          ; Loop until done
         ret
-;;;
-;;; Disk routine
-;;; 
-;;; Command in b:
-;;;   0,4 - Restore
-;;;   1   - Read
-;;;   2   - Write with    RAW verification
-;;;   5   - format
-;;;   6   - Write without RAW verification
-;;;
-;;; c  = disk   number
-;;; d  = track  number
-;;; e  = sector number
-;;; hl = data pointer (but never used)
-;;;
+;
+; Disk routine
+; 
+; Command in b:
+;   0,4 - Restore
+;   1   - Read
+;   2   - Write with    RAW verification
+;   5   - format
+;   6   - Write without RAW verification
+;
+; c  = disk   number
+; d  = track  number
+; e  = sector number
+; hl = data pointer (but never used)
+;
 disk1:  shld    dskptr          ; Save data pointer (but this never used)
         SSPD    DSKSTK
         lxi     sp, STACK3
@@ -1090,7 +1091,7 @@ disk1:  shld    dskptr          ; Save data pointer (but this never used)
         JRZ     dfrmt
         cpi     01h             ; Read
         JRZ     dread
-;;; Here for write
+; Here for write
         push    d
         push    b
         call    hst2fp          ; Copy data to CPU2
@@ -1101,7 +1102,7 @@ drestr: call    fparam          ; Send parameters
         call    fpstat          ; Get status to return
 dexit:  LSPD    DSKSTK
         ret
-;;;
+;
 dread:  push    h               ; Save data pointer (why is dskptr not used?)
         call    fparam          ; Send parameters
         call    fpwres          ; Wait for result
