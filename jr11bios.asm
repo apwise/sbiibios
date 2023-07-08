@@ -1,5 +1,5 @@
 xmatch  equ     1
-;        .TITLE  'SUPERBRAIN II BIOS FOR QUAD DENSITY VER 1.1 64K DOS; CPM VER 2.2 (QD11BIOS.ASM)'
+;        .TITLE  'SUPERBRAIN II BIOS FOR JUNIOR VER 1.1 64K DOS; CPM VER 2.2 (JR11BIOS.ASM)'
 ;
 ;
 ;*******  DISKS 'A' AND 'B' MUST BE 512 BYTES/SECTOR  ************
@@ -269,7 +269,12 @@ DPB0    EQU     $
         DB      4
         DB      15
         DB      1
+        if      xmatch
         DW      169
+        endif
+        if      NOT xmatch
+        DW      81
+        endif
         DW      63
         DB      128
         DB      0
@@ -867,7 +872,12 @@ dfldrv: db      0
 ;
 sgnon:
 ;
+        if      xmatch
         DB      'SUPERBRAIN II QUAD DENSITY DOS VER 1.1, FOR CP/M 2.2     ',0AH,0DH,80H
+        endc
+        if      NOT xmatch
+        DB      'SUPERBRAIN II JUNIOR DOS VER 1.1, FOR CP/M 2.2           ',0AH,0DH,80H
+        endc
 ;
 ;
 ;
@@ -881,7 +891,7 @@ sgnon:
 ;
 USRSTRT EQU     $       ;USER START ADDRESS
 ;
-;USRSIZE        EQU     5000H+OFFSET-$  ;NUMBER OF BYTES AVAILABLE (HEX)
+USRSIZE EQU     5000H+OFFSET-$  ;NUMBER OF BYTES AVAILABLE (HEX)
 ;
 USREND  EQU     4FFFH+OFFSET    ;USER END ADDRESS
 ;
