@@ -74,7 +74,7 @@ cr      equ     0dh     ;carriage return
 lf      equ     0ah     ;line feed
 ctl     equ     5eh     ;up arrow
 ;
-        db      07ah,016h,0,0,063h,08ch ; Intertec Superbrain serial number
+        db      07ah,016h,0,0,063h,08ch ;Intertec Superbrain serial number
 ;
 ;       enter here from the user's program with function number in c,
 ;       and information address in d,e

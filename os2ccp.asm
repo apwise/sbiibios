@@ -396,7 +396,7 @@ intvec:
         db      'REN '
         db      'USER'
         intlen equ ($-intvec)/4 ;intrinsic function length
-        serial: db 07ah,016h,0,0,063h,08ch
+        serial: db 07ah,016h,0,0,063h,08ch ;Intertec Superbrain serial number
 ;
 ;
 intrinsic:

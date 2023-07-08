@@ -1,0 +1,15 @@
+Maslin/qdhdbios/flopboot.asm
+
+os2ccp.asm and os3bdos.asm from cpm2-plm.zip
+downloaded from http://www.retroarchive.org/cpm/archive/unofficial/source.html
+(Link labelled as "CP/M 2.2 ORIGINAL SOURCE"
+
+jr11bios.asm, based on:
+  qd31bios.asm  Dunfield/csysgen/qd31bios.asm
+  cse30bs.asm   Maslin/csr30enh/0/cse30bs.asm
+
+sbiibios.asm - disassembled from:
+  "SB II BOOT.zip" shared with my by Jon Bradbury
+  From which the first two tracks extracted and converted to hex as:
+  SBIIBOOT.hex
+
