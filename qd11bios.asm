@@ -1,4 +1,5 @@
-;        .TITLE  'SUPERBRAIN BIOS FOR QUAD DENSITY VER 3.1 64K DOS; CPM VER 2.2 (QD31BIOS.ASM) 05/08/81'
+xmatch  equ     1
+;        .TITLE  'SUPERBRAIN II BIOS FOR QUAD DENSITY VER 1.1 64K DOS; CPM VER 2.2 (QD11BIOS.ASM)'
 ;
 ;
 ;*******  DISKS 'A' AND 'B' MUST BE 512 BYTES/SECTOR  ************
@@ -19,37 +20,47 @@ CRTOUT  EQU     500CH+OFFSET
 CONSTK  EQU     5002H+OFFSET
 KBBUFF  EQU     505BH+OFFSET    ;CCP'S KEYBOARD BUFFER
 BUFCNT  EQU     505DH+OFFSET    ;TYPE-AHEAD BUFFER COUNT
-TIME    EQU     0042H           ;TIME ( IN ASCII )
-DATE    EQU     004BH           ;DATE ( BCD )
-;
-;
-;
-;
-;
 ;
         ORG     5B00H+OFFSET
 ;
-;BAUD:   DB      77H             ;BAUD RATE (1200) LOCATED ON TRACK 1, SECT 30
-                                ;FOR MAIN AND AUX PORTS
+        if      xmatch
 BAUD:   db      0eeh
+        endif
+        if      NOT xmatch
+BAUD:   DB      77H             ;BAUD RATE (1200) LOCATED ON TRACK 1, SECT 30
+        endif
+                                ;FOR MAIN AND AUX PORTS
 MNMODE: DB      4EH             ;MAIN PORT MODE (8 BITS, 1SB, NO PAR)
 MNCMD:  DB      17H             ;MAIN PORT COMMAND BYTE
 AUXMOD: DB      4EH             ;AUX PORT MODE (8BITS, 1SB, NO PAR)
 AUXCMD: DB      17H             ;AUX PORT COMMAND BYTE
-;FREQ:   DB      4BH             ;4BH=60HZ, 0BH=50HZ
-FREQ:   db      20h
+        if      xmatch
+FREQ:   db      20h             ;50/60 HZ FREQUENCY BYTE
+        endif
+        if      NOT xmatch
+FREQ:   DB      60H             ;50/60 HZ FREQUENCY BYTE
+        endif
 HDSHAK: DB      00H             ;00 = DSR DISABLED; 01 = DSR ENABLED
 RAW:    DB      00H             ;00 = NO DISK READ VERIFY; FF = READ VERIFY
-;TIMENB: DB      0FFH            ;00 = TIME FUNCTION DISABLED; FF = TIME ENABLED
+        if      xmatch
 TIMENB: db      0
-;SYNC:   DS      1               ;SYNC CHARACTER VALUE STORED HERE
 SYNC:   db      0d3h
-;        DS      4
-        db      01h, 70h, 0d2h, 0feh
-;KEYPAD: DB      81H,82H,83H,85H,0DH,2CH,2DH,2EH,30H
+        endif
+        if      NOT xmatch
+TIMENB: DB      0FFH            ;00 = TIME FUNCTION DISABLED; FF = TIME ENABLED
+SYNC:   DS      1               ;SYNC CHARACTER VALUE STORED HERE
+        endif
+KEYCLK: DB      01H             ;00 = KEY CLICK DISABLED, 01 = KEY CLICK ENABLED
+        if      xmatch
+        db      70h, 0d2h, 0feh
 KEYPAD: db      13h,04h,05h,18h,11h,01h,06h,03h,02h
-;        DB      31H,32H,33H,34H,35H,36H,37H,38H,39H
         db      10h,0bh,12h,16h,0eh,1ah,19h,14h,17h
+        endif
+        if      NOT xmatch
+        DS      3
+KEYPAD: DB      81H,82H,83H,85H,0DH,2CH,2DH,2EH,30H
+        DB      31H,32H,33H,34H,35H,36H,37H,38H,39H
+        endif
 ;
 ;
 WMSTRT  EQU     5A80H+OFFSET    ;WARM START ROUTINE
@@ -60,7 +71,7 @@ WMSTRT  EQU     5A80H+OFFSET    ;WARM START ROUTINE
 ;**************************************************************************
 ;
 ;
-;          SUPERBRAIN BIOS INTERFACE MODULE
+;          SUPERBRAIN II BIOS INTERFACE MODULE
 ;
 ;
 ;**************************************************************************
@@ -198,24 +209,20 @@ AUXIN:  IN      AUXST           ;GET STATUS
 ;
 ;AUX PORT SERIAL DATA OUT
 ;
-AUXOUT: LDA     HDSHAK          ;IS HANDSHAKING ENABLED?
-        ANI     01H
-        rar
-        rar
-        ori     01h
-        mov     d,a
-        ;JZ      AUXOT1          ;NO
-AUXOT:  IN      AUXST           ;GET AUX PORT STATUS
-        ana     d
-        xra     d
-        jnz     AUXOT
-        ;ANI     80H             ;DATA SET READY (DSR) = 1?
-        ;JZ      AUXOT           ;NO
-;AUXOT1: IN      AUXST           ;GET AUX PORT STATUS
-        ;ANI     01H             ;TRANSMITTER EMPTY?
-        ;JZ      AUXOT1          ;NO
-        MOV     A,C             ;GET CHARACTER
-        OUT     AUXDAT
+AUXOUT:
+        LDA     HDSHAK          ;GET HANDSHAKING BIT
+        ANI     01H             ;MASK TO LOWER BIT ONLY
+        RAR
+        RAR                     ;MOVE LOWER BIT TO UPPER BIT LOCATION
+        ORI     01H             ;MASK IN THE TX BUFFER EMPTY BIT
+        MOV     D,A             ;AND SAVE NEW MASK IN [D]
+AUXOT:
+        IN      AUXST           ;GET THE STATUS BYTE
+        ANA     D               ;MASK OFF REQ'D BITS
+        XRA     D               ;INSURE ALL ARE PRESENT TOGETHER
+        JNZ     AUXOT           ;NO, THEN TRY UNTIL ALL IS READY
+        MOV     A,C             ;GET THE CHARACTER
+        OUT     AUXDAT          ;AND SEND THE CHARACTER OUT
         RET
 ;
 ;MAIN PORT SERIAL DATA IN
@@ -293,33 +300,31 @@ PHYSEC:
 ;
 ;
 BEGDAT  EQU     $
-;ALV0:   DS      31
+        if      xmatch
 ALV0:   db      16h, 17h, 1ch, 1dh, 1eh, 1fh, 24h, 25h
         db      26h, 27h, 01h, 02h, 03h, 04h, 05h, 06h
         db      07h, 08h, 09h, 0ah, 05h, 06h, 07h, 08h
         db      09h, 0ah, 0bh, 0ch, 0dh, 0eh, 0fh
-;CSV0:   DS      16
 CSV0:   db      10h, 11h, 12h, 13h, 14h, 15h, 16h, 17h
         db      18h, 19h, 1ah, 1bh, 1ch, 1dh, 1eh, 1fh
-;ALV1:   DS      31
 ALV1:   db      20h, 21h, 22h, 23h, 24h, 25h, 26h, 27h
         db      01h, 03h, 05h, 07h, 09h, 02h, 04h, 3ah
         db      2eh,0e2h,0b7h,0c4h, 43h,0e1h,0afh, 32h
         db      2dh,0e2h, 3ah, 24h,0e2h, 32h, 28h
-;CSV1:   DS      16
 CSV1:   db      0e2h,4fh,0afh, 47h,0cdh, 0fh,0e4h,0b7h
         db      32h, 3ah, 47h,0e2h,0b7h,0c4h, 5ch,0e1h
+        endif
+        if      NOT xmatch
+ALV0:   DS      31
+CSV0:   DS      16
+ALV1:   DS      31
+CSV1:   DS      16
+        endif
 ;
 ENDAT   EQU     $
 DATSIZ: EQU     $-BEGDAT
 ;
-;
-;
-;
-;
-;
-;
-;TABLE OF EQUATES--I/O DEVICES
+; TABLE OF EQUATES--I/O DEVICES
 ;
 AUXDAT  EQU     40H             ;AUX PORT DATA
 AUXST   EQU     41H             ;AUX PORT STATUS
@@ -332,6 +337,20 @@ PPIA    EQU     68H             ;8255 PORT A
 PPIB    EQU     69H             ;8255 PORT B
 PPIC    EQU     6AH             ;8255 PORT C
 PPICW   EQU     6BH             ;8255 CONTROL PORT
+TENTHS  EQU     31H             ;RTC TENTHS DIGIT (R/O)
+USECS   EQU     32H             ;RTC UNITS OF SECONDS (R/O)
+TSECS   EQU     33H             ;RTC TENS OF SECONDS (R/O)
+UMINS   EQU     34H             ;RTC UNITS OF MINUTES (R/W)
+TMINS   EQU     35H             ;RTC TENS OF MINUTES (R/W)
+UHRS    EQU     36H             ;RTC UNITS OF HOURS (R/W)
+THRS    EQU     37H             ;RTC TENS OF HOURS (R/W)
+UDAYS   EQU     38H             ;RTC UNITS OF DAYS (R/W)
+TDAYS   EQU     39H             ;RTC TENS OF DAYS (R/W)
+DAYOW   EQU     3AH             ;RTC DAY OF THE WEEK (R/W)
+UMONTH  EQU     3BH             ;RTC UNITS OF MONTHS (R/W)
+TMONTH  EQU     3CH             ;RTC TENS OF MONTHS (R/W)
+YEARS   EQU     3DH             ;RTC LEAP YEAR SETTING (W/O)
+START   EQU     3EH             ;RTC START/STOP PORT (W/O)
 TOPSEL  EQU     02H             ;CRTC TOP OF PAGE REGISTER
 ROWSTR  EQU     01H             ;CRTC ROW START REGISTER
 CURSOR  EQU     03H             ;CRTC CURSOR REGISTER
@@ -342,7 +361,6 @@ BRKTIM  EQU      15             ;250 MILLISEC BREAK TIME FOR COMM PORT
 LPF     EQU      24             ;NO. OF ROWS ON CRT
 ;
 ;
-
 ;*****************************************************
 ;*                                                   *
 ;*      Sector Deblocking Algorithms for CP/M 2.0    *
@@ -419,7 +437,7 @@ settrk:
         ret
 ;
 setsec:
-        ;set sector given by register c
+        ;set sector given by register c 
         mov     a,c
         sta     seksec          ;sector to seek
         ret
@@ -792,53 +810,63 @@ msg5:   db      0ah,0dh,'*** lost data ***',80h
 ;*                                                   *
 ;*****************************************************
 ;
-;sekdsk: ds      1               ;seek disk number
+        if      xmatch
 sekdsk: db      2ah
-;sektrk: ds      2               ;seek track number
 sektrk: dw      202ah
-;seksec: ds      1               ;seek sector number
 seksec: db      72h
-;
-;hstdsk: ds      1               ;host disk number
+; 
 hstdsk: db      65h
-;hsttrk: ds      2               ;host track number
 hsttrk: dw      6f63h
-;hstsec: ds      1               ;host sector number
 hstsec: db      72h
 ;
-;sekhst: ds      1               ;seek shr secshf
 sekhst: db      64h
-;hstact: ds      1               ;host active flag
 hstact: db      20h
-;hstwrt: ds      1               ;host written flag
 hstwrt: db      6eh
 ;
-;unacnt: ds      1               ;unalloc rec cnt
 unacnt: db      6fh
-;unadsk: ds      1               ;last unalloc disk
 unadsk: db      74h
-;unatrk: ds      2               ;last unalloc track
 unatrk: dw      6620h
-unasec: ds      1               ;last unalloc sector
+unasec: db      0
 ;
-;erflag: ds      1               ;error reporting
 erflag: db      53h
-;rsflag: ds      1               ;read sector flag
 rsflag: db      55h
-;readop: ds      1               ;1 if read operation
 readop: db      50h
-;wrtype: ds      1               ;write operation type
 wrtype: db      45h
-;dmaadr: ds      2               ;last dma address
 dmaadr: dw      4252h
 ;
 dfldrv: db      0
+        endif
+        if      NOT xmatch
+sekdsk: ds      1               ;seek disk number
+sektrk: ds      2               ;seek track number
+seksec: ds      1               ;seek sector number
+;
+hstdsk: ds      1               ;host disk number
+hsttrk: ds      2               ;host track number
+hstsec: ds      1               ;host sector number
+;
+sekhst: ds      1               ;seek shr secshf
+hstact: ds      1               ;host active flag
+hstwrt: ds      1               ;host written flag
+;
+unacnt: ds      1               ;unalloc rec cnt
+unadsk: ds      1               ;last unalloc disk
+unatrk: ds      2               ;last unalloc track
+unasec: ds      1               ;last unalloc sector
+;
+erflag: ds      1               ;error reporting
+rsflag: ds      1               ;read sector flag
+readop: ds      1               ;1 if read operation
+wrtype: ds      1               ;write operation type
+dmaadr: ds      2               ;last dma address
+;
+dfldrv: db      0
+        endif
 ;
 ;
 ;
 sgnon:
 ;
-;        DB      '64K SUPERBRAIN QUAD DENSITY DOS VER 3.1 FOR CP/M 2.2   ',0AH,0DH,80H
         DB      'SUPERBRAIN II QUAD DENSITY DOS VER 1.1, FOR CP/M 2.2     ',0AH,0DH,80H
 ;
 ;
