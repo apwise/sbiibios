@@ -51,6 +51,20 @@ PPIA    EQU     68h             ; 8255 port a
 PPIB    EQU     69h             ; 8255 port b
 PPIC    EQU     6ah             ; 8255 port c
 PPICW   EQU     6bh             ; 8255 control port
+TENTHS  EQU     31h             ; RTC tenths digit (r/o)
+USECS   EQU     32h             ; RTC units of seconds (r/o)
+TSECS   EQU     33h             ; RTC tens of seconds (r/o)
+UMINS   EQU     34h             ; RTC units of minutes (r/w)
+TMINS   EQU     35h             ; RTC tens of minutes (r/w)
+UHRS    EQU     36h             ; RTC units of hours (r/w)
+THRS    EQU     37h             ; RTC tens of hours (r/w)
+UDAYS   EQU     38h             ; RTC units of days (r/w)
+TDAYS   EQU     39h             ; RTC tens of days (r/w)
+DAYOW   EQU     3ah             ; RTC day of the week (r/w)
+UMONTH  EQU     3bh             ; RTC units of months (r/w)
+TMONTH  EQU     3ch             ; RTC tens of months (r/w)
+YEARS   EQU     3dh             ; RTC leap year setting (w/o)
+START   EQU     3eh             ; RTC start/stop port (w/o)
 TOPSEL  EQU     02h             ; CRTC top of page register
 ROWSTR  EQU     01h             ; CRTC row start register
 CURSOR  EQU     03h             ; CRTC cursor register
