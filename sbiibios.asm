@@ -143,14 +143,14 @@ INTSTK: ds      2               ; Save SP during interrupts
         endif
 dskptr: ds      2               ; Save disk data pointer (but unused)
 vidatr: ds      1               ; Video attribute byte
-KBBUFF: db      0               ; ... replaces kbchar in os3bdos
+KBBUFF: db      0               ; CCP's keyboard buffer
         if      xmatch
 brkctr: db      43h             ; Main port break time counter
         endif
         if      NOT xmatch
 brkctr: db      0               ; Main port break time counter
         endif
-BUFCNT: ds      1               ; No. of chars in KBDBUF
+BUFCNT: ds      1               ; Type-ahead buffer count
 scrlck: db      0               ; Scroll lock
 kbwptr: ds      2               ; Type-ahead buffer write pointer
 kbrptr: ds      2               ; Type-ahead buffer read pointer

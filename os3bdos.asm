@@ -54,6 +54,10 @@ writef  set     bios+3*14       ;write disk function
 liststf set     bios+3*15       ;list status function
 sectran set     bios+3*16       ;sector translate
 ;
+;       variables in Superbrain private BIOS module
+KBBUFF  EQU     0E45BH          ;CCP'S KEYBOARD BUFFER
+BUFCNT  EQU     0E45DH          ;TYPE-AHEAD BUFFER COUNT
+;
 ;       equates for non graphic characters
 ctlc    equ     03h     ;control c
 ctle    equ     05h     ;physical eol
@@ -70,7 +74,7 @@ cr      equ     0dh     ;carriage return
 lf      equ     0ah     ;line feed
 ctl     equ     5eh     ;up arrow
 ;
-        db      07ah,016h,0,0,063h,08ch
+        db      07ah,016h,0,0,063h,08ch ; Intertec Superbrain serial number
 ;
 ;       enter here from the user's program with function number in c,
 ;       and information address in d,e
@@ -161,9 +165,7 @@ errflg:
 ;       console handlers
 conin:
         ;read console character to A
-        ;lxi h,kbchar
-        lxi h,0e45bh
-        mov a,m! mvi m,0! ora a! rnz
+        lxi h,kbchar! mov a,m! mvi m,0! ora a! rnz
         ;no previous keyboard character ready
         jmp coninf ;get character externally
         ;ret
@@ -185,9 +187,7 @@ echoc:
         cpi ' '! ret ;carry set if not graphic
 ;
 conbrk: ;check for character ready
-        ;lda kbchar
-        lda 0e45bh
-        ora a! jnz conb1 ;skip if active kbchar
+        lda kbchar! ora a! jnz conb1 ;skip if active kbchar
                 ;no active kbchar, check external break
                 call constf! ani 1! rz ;return if no char ready
                 ;character ready, read it
@@ -200,8 +200,7 @@ conbrk: ;check for character ready
                 xra a! ret ;with zero in accumulator
         conb0:
                 ;character in accum, save it
-                ;sta kbchar
-                sta 0e45bh
+                sta kbchar
         conb1:
                 ;return with true set in accumulator
                 mvi a,1! ret
@@ -499,7 +498,9 @@ compcol:db      0       ;true if computing column position
 strtcol:db      0       ;starting column position after read
 column: db      0       ;column position
 listcp: db      0       ;listing toggle
-kbchar: db      0       ;initial key char = 00
+;kbchar: db      0       ;initial key char = 00
+        db      0
+kbchar  EQU     KBBUFF
 entsp:  ds      2       ;entry stack pointer
         ds      ssize*2 ;stack size
 lstack:
@@ -1704,8 +1705,11 @@ diskwrite:      ;(may enter here from seqdiskwrite above)
                 mvi c,2 ;mark as record count incremented
         diskwr2:
         ;A has vrecord, C=2 if new block or new record#
+        ;
+        ;Difference in Intertec Superbrain version
         ;dcr c! ;dcr c! ;jnz noupdate
         nop! nop! lxi h, 0c800h
+        ;
                 push psw ;save vrecord value
                 call getmodnum ;HL=.fcb(modnum), A=fcb(modnum)
                 ;reset the file write flag to mark as written fcb
@@ -2181,5 +2185,5 @@ dcnt:   ds      word    ;directory counter 0,1,...,dirmax
 drec:   ds      word    ;directory record 0,1,...,dirmax/4
 ;
 ;bios   equ     ($ and 0ff00h)+100h     ;next module
-bios   equ      0de00h  ;next module
+bios    equ     0de00h  ;next module
         end
