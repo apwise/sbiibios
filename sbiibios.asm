@@ -1,4 +1,4 @@
-match   EQU     1
+xmatch  EQU     1
         MACLIB  Z80
 ;;;
 OFFSET  EQU     9400h           ; OFFSET for 64K = 9400h
@@ -64,14 +64,14 @@ CPR     EQU     80              ; No. of chars per row
         ASEG
         ORG     PVBIOS
 ;;;
-        if      match
+        if      xmatch
 rowcol: dw      3745h           ; Row and column as a 16-bit value
 vidcol  EQU     rowcol          ; Low byte is column
 vidrow  EQU     rowcol+1        ; High byte is row
 CONSTK: dw      3545h           ; Save SP during console routines
 DSKSTK: dw      4443h           ; Save SP during disk routines
         endif
-        if      NOT match
+        if      NOT xmatch
 rowcol: ds      2               ; Row and column as a 16-bit value
 vidcol  EQU     rowcol          ; Low byte is column
 vidrow  EQU     rowcol+1        ; High byte is row
@@ -87,7 +87,7 @@ vtopsc: ds      2               ; Copy of vtopsl for this frame
 vtopsl: ds      2               ; Video top select
 vidchr: ds      1               ; Character being sent to screen
 vrwenp: ds      2               ; Pointer into vrwenc
-        if      match
+        if      xmatch
 vrwenc: db      39h, 33h, 45h, 30h, 41h, 0dh, 0ah, 3ah
         db      31h, 38h, 45h, 37h, 31h, 35h, 30h, 30h
         db      30h, 44h, 44h, 33h, 36h, 42h, 33h, 45h
@@ -100,7 +100,7 @@ vrwen:  db      46h, 33h, 32h, 34h, 44h, 45h, 34h, 43h
 belctr: db      45h             ; Bell counter
 krptct: db      37h             ; Keyboard repeat counter
         endif
-        if      NOT match
+        if      NOT xmatch
 ;;; Copy of vrwen used (in interrupt routine) during video frame
 vrwenc: ds      CPR + 1
 ;;; Video row enables - 1 byte per row of video
@@ -110,7 +110,7 @@ krptct: db      0               ; Keyboard repeat counter
         endif
 vchset: ds      1               ; Select alternate character set
 escst1: ds      1               ; Escape state-machine state 1
-        if      match
+        if      xmatch
 escst2: db      32h             ; Escape state-machine state 2
 vtrans: db      41h             ; Transparanet mode - display control characters
 scncol: db      31h             ; Screen column
@@ -118,7 +118,7 @@ scnrow: db      32h             ; Screen row
 vlinum: db      43h             ; Video line number in interrupt routine
 INTSTK: dw      3134h           ; Save SP during interrupts
         endif
-        if      NOT match
+        if      NOT xmatch
 escst2: ds      1               ; Escape state-machine state 2
 vtrans: ds      1               ; Transparanet mode - display control characters
 scncol: ds      1               ; Screen column
@@ -129,10 +129,10 @@ INTSTK: ds      2               ; Save SP during interrupts
 dskptr: ds      2               ; Save disk data pointer (but unused)
 vidatr: ds      1               ; Video attribute byte
 KBBUFF: db      0               ; ... replaces kbchar in os3bdos
-        if      match
+        if      xmatch
 brkctr: db      43h             ; Main port break time counter
         endif
-        if      NOT match
+        if      NOT xmatch
 brkctr: db      0               ; Main port break time counter
         endif
 BUFCNT: ds      1               ; No. of chars in KBDBUF
