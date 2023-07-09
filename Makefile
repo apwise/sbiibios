@@ -33,17 +33,17 @@ os3bdos.com: os3bdos.rel
 	rm -f os3bdos.tmp
 #                                             0xd000+1                    0xded
 
-jr11bios.hex: jr11bios.asm
+jriibios.hex: jriibios.asm
 	cpm $(ASM) $<
 
-jr11bios.com config.com: jr11bios.hex
-	sed '/^:000000/q' jr11bios.hex > jr11bios.tmp
-	objcopy -I ihex -O binary jr11bios.tmp jr11bios.tm2
-	head -c  1175 jr11bios.tm2 > jr11bios.com
-	tail -c +4353 jr11bios.tm2 > config.com
-	rm -f jr11bios.tmp jr11bios.tm2
+jriibios.com config.com: jriibios.hex
+	sed '/^:000000/q' jriibios.hex > jriibios.tmp
+	objcopy -I ihex -O binary jriibios.tmp jriibios.tm2
+	head -c  1175 jriibios.tm2 > jriibios.com
+	tail -c +4353 jriibios.tm2 > config.com
+	rm -f jriibios.tmp jriibios.tm2
 
-# && truncate --size=1536 jr11bios.com
+# && truncate --size=1536 jriibios.com
 # && truncate --size=128 config.com
 
 junk1: SBIIBOOT.dsk
@@ -64,7 +64,7 @@ junk2: SBIIBOOT.dsk
 	tail -c +9134 $< | head -c 979 > $@
 #              0x23ad+1          0x2780 - 0x23ad
 
-# config.com (from jr11bios) comes here
+# config.com (from jriibios) comes here
 
 junk3: SBIIBOOT.dsk
 	tail -c +10145 $< | head -c 96 > $@ 
@@ -72,7 +72,7 @@ junk3: SBIIBOOT.dsk
 
 # mv os2ccp.com os2ccp.tmp && tail -c +51200 os2ccp.tmp | head -c -2034 > os2ccp.com
 
-system.dsk: flopboot.com os2ccp.com os3bdos.com jr11bios.com junk1 sbiibios.com junk2 config.com junk3
+system.dsk: flopboot.com os2ccp.com os3bdos.com jriibios.com junk1 sbiibios.com junk2 config.com junk3
 	cat $^ > $@
 
 system.hex: system.dsk
@@ -85,7 +85,7 @@ clean:
 	rm -f flopboot.hex flopboot.prn flopboot.sym flopboot.com flopboot.tmp
 	rm -f os2ccp.rel   os2ccp.prn   os2ccp.sym   os2ccp.com   os2ccp.tmp
 	rm -f os3bdos.rel  os3bdos.prn  os3bdos.sym  os3bdos.com  os3bdos.tmp
-	rm -f jr11bios.hex jr11bios.prn jr11bios.sym jr11bios.com jr11bios.tmp jr11bios.tm2 config.com 
+	rm -f jriibios.hex jriibios.prn jriibios.sym jriibios.com jriibios.tmp jriibios.tm2 config.com 
 	rm -f sbiibios.rel sbiibios.prn sbiibios.sym sbiibios.com sbiibios.tmp
 	rm -f system.dsk   system.hex   diffs.txt
 	rm -f junk1 junk2 junk3
