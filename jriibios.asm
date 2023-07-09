@@ -1,5 +1,5 @@
 xmatch  equ     1
-;        .TITLE  'SUPERBRAIN II BIOS FOR JUNIOR VER 1.1 64K DOS; CPM VER 2.2 (JR11BIOS.ASM)'
+;        .TITLE  'SUPERBRAIN II BIOS FOR JUNIOR VER 1.1, CPM VER 2.2 (JRIIBIOS.ASM) 4/21/82'
 ;
 ;
 ;*******  DISKS 'A' AND 'B' MUST BE 512 BYTES/SECTOR  ************
@@ -71,7 +71,7 @@ WMSTRT  EQU     5A80H+OFFSET    ;WARM START ROUTINE
 ;**************************************************************************
 ;
 ;
-;          SUPERBRAIN II BIOS INTERFACE MODULE
+;          SUPERBRAIN JUNIOR II BIOS INTERFACE MODULE
 ;
 ;
 ;**************************************************************************
@@ -154,9 +154,9 @@ CONST:  MVI     A,0FH           ;RESET KEYBOARD
         OUT     PPICW
         LDA     BUFCNT          ;ANYTHING IN THE BUFFER?
         ORA     A
-        jnz     CONST1
-        lda     KBBUFF
-        ora     a
+        JNZ     CONST1          ;INDICATE CHARACTER AVAILABLE
+        LDA     KBBUFF
+        ORA     A               ;CHECK FOR A CHARACTER
         RZ                      ;RETURN IF EMPTY
 CONST1: MVI     A,0FFH          ;CHARACTER READY STATUS
         RET
