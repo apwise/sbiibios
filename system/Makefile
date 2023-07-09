@@ -46,7 +46,7 @@ jriibios.com config.com: jriibios.hex
 # && truncate --size=1536 jriibios.com
 # && truncate --size=128 config.com
 
-junk1: SBIIBOOT.dsk
+junk1: originals/SBIIBOOT.dsk
 	tail -c +6936 $< | head -c 361 > $@ 
 #              0x1b17+1          0x1c80 - 0x1b17
 
@@ -60,13 +60,13 @@ sbiibios.com: sbiibios.rel
 
 # && truncate --size=2816 sbiibios.com
 
-junk2: SBIIBOOT.dsk
+junk2: originals/SBIIBOOT.dsk
 	tail -c +9134 $< | head -c 979 > $@
 #              0x23ad+1          0x2780 - 0x23ad
 
 # config.com (from jriibios) comes here
 
-junk3: SBIIBOOT.dsk
+junk3: originals/SBIIBOOT.dsk
 	tail -c +10145 $< | head -c 96 > $@ 
 #              0x27a0+1           0x2800 - 0x27a0
 
@@ -79,7 +79,7 @@ system.hex: system.dsk
 	od -tx1z -A x system.dsk > system.hex
 
 diffs.txt: system.hex
-	sdiff -w 160 SBIIBOOT.hex system.hex > $@
+	sdiff -w 160 originals/SBIIBOOT.hex system.hex > $@
 
 clean:
 	rm -f flopboot.hex flopboot.prn flopboot.sym flopboot.com flopboot.tmp
