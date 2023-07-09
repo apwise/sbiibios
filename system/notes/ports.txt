@@ -1,11 +1,11 @@
 PPIA[0] - out: Whole screen alternate set (1 = alt, 0 = nrm)
-PPIA[1] - ? Addressing of character ROM
-PPIA[2] - ? Addressing of character ROM
+PPIA[1] - ? Addressing of character ROM (No purpose - 1982/10 superletter)
+PPIA[2] - ? Addressing of character ROM (1 = use only primary char set - 1982/10 superletter)
 PPIA[3] (unused on schematic)
 PPIA[4] (unused on schematic)
 PPIA[5] - out: Address attr. RAM (0 = attr, 1 - normal)
 PPIA[6] - out: Video freq. 1 = 60Hz, 0 = 50Hz
-PPIA[7] - out: Whole screen revers. vid (0 = reverse, 1 = normal)
+PPIA[7] - out: Whole screen revers. vid (0 = reverse, 1 = normal) (1 = black on white)
 
 PPIB[0] - in: New key down? (0 = no, 1 = new key)
 PPIB[1] - in: Any key still down (0 = none, 1 = key down)
