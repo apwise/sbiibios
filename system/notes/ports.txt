@@ -1,0 +1,45 @@
+PPIA[0] - out: Whole screen alternate set (1 = alt, 0 = nrm)
+PPIA[1] - ? Addressing of character ROM
+PPIA[2] - ? Addressing of character ROM
+PPIA[3] (unused on schematic)
+PPIA[4] (unused on schematic)
+PPIA[5] - out: Address attr. RAM (0 = attr, 1 - normal)
+PPIA[6] - out: Video freq. 1 = 60Hz, 0 = 50Hz
+PPIA[7] - out: Whole screen revers. vid (0 = reverse, 1 = normal)
+
+PPIB[0] - in: New key down? (0 = no, 1 = new key)
+PPIB[1] - in: Any key still down (0 = none, 1 = key down)
+PPIB[2] - in: Interrupt (0 = Horiz, 1 - Vert)
+PPIB[3] (unused on schematic)
+PPIB[4] - in: Something on main port (pin 47) RI?  ?? TBC ??
+PPIB[5] - in: CPU2 busy ? (1 = busy, 0 = not)
+PPIB[6] - in: CAPS lock (1 = not, 0 = CAPs lock)
+PPIB[7] - in: CPU2 bus ack? (1 = not, 0 = ACKed - OK to map RAM)
+
+PPIC[0] - out: Addr/Data bus swap for CRTC (1 = swapped, 0 = normal)
+PPIC[1] - out: Blank video (1 = blank, 0 = display)
+PPIC[2] - out: 1 = Boot ROM mapped, 0 = not        ?? TBC ??
+PPIC[3] - out: CPU2 reset (1 = reset, 0 = not)     ?? TBC ??
+PPIC[4] - out: CPU2 RAM mapping (0 = mapped, 1 = normal state)
+PPIC[5] - out: Request CPU2 (0 = request, 1 = normal state)
+PPIC[6] - out: Bell (1 = on, 0 = off)
+PPIC[7] - out: Keyboard ACK (pulse low)
+
+Initialisation in boot ROM
+
+82 -> PPICW (Port B input, all others output, simple I/O)
+2A -> PPIC - 00101010 (!Req CPU2, ??, Blank video)
+43 -> PPIA - 01000011 (60Hz, ??)
+
+B2 -> PPIC - 10110010 (!Req CPU2, !Map RAM, ??, blank video, not alternate)
+
+Guessing it's PPIC[2] and/or PPIC[3] which have pull-ups
+(PPIC[6:2] all have pull-ups)
+
+PPIC[2] goes to logic controlling enable on bus-bridge
+PPIC[3] goes to CPU2 ~RESET
+
+
+
+
+Not DSR, RXD, CTS, RXclk, TXclk, 

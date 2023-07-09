@@ -1,0 +1,8 @@
+scrllck not reset
+kmap81, etc - but already mapped in CONFIG table
+Limits on ESC Y screen position both row and col
+ESC~S doesn't do what the manual says - it just forces the top bit on (OR not XOR!)
+vidclr enable interrupts with PPIA[5] switched to attribute RAM!
+scrol1 - is this dead code
+inisyn - seems to have the bit upside down? 0 = double character SYNC
+disk1 - hl pointer never used (nor dskptr variable, except to save hl)
