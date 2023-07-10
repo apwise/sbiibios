@@ -2,8 +2,12 @@ ASM  := ASM
 RMAC := RMAC
 LINK := LINK
 
+BUILD_DIR := ../build
 
-all: jriicpm.com
+all: $(BUILD_DIR)/jriicpm.com
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
 sysgen.rel: sysgen.asm
 	cpm $(RMAC) $<
@@ -63,7 +67,7 @@ sbiibios.com: sbiibios.rel
 		&& truncate --size=2816 $@ \
 		&& rm -f sbiibios.tmp
 
-jriicpm.com: sysgen.com flopboot.com os2ccp.com os3bdos.com jriibios.com sbiibios.com config.com
+$(BUILD_DIR)/jriicpm.com: sysgen.com flopboot.com os2ccp.com os3bdos.com jriibios.com sbiibios.com config.com | $(BUILD_DIR)
 	cat $^ > $@
 
 clean:
@@ -73,8 +77,8 @@ clean:
 	rm -f os3bdos.rel  os3bdos.prn  os3bdos.sym  os3bdos.com  os3bdos.tmp
 	rm -f jriibios.hex jriibios.prn jriibios.sym jriibios.com jriibios.tmp jriibios.tm2 config.com 
 	rm -f sbiibios.rel sbiibios.prn sbiibios.sym sbiibios.com sbiibios.tmp
-	rm -f jriicpm.com
+	rm -f $(BUILD_DIR)/jriicpm.com
 	rm -f 'xxprog.$$$$$$' 'xxabs.$$$$$$'
 	rm -f *~
 
-.PHONY:	clean
+.PHONY:	all clean
