@@ -4,7 +4,7 @@ LINK := LINK
 
 BUILD_DIR := ../build
 
-all: $(BUILD_DIR)/jriicpm.com $(BUILD_DIR)/qdiicpm.com
+all: $(BUILD_DIR)/SBIICPM.COM $(BUILD_DIR)/QDIICPM.COM
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -47,41 +47,43 @@ os3bdos.com: os3bdos.rel
 		&& rm -f os3bdos.tmp
 #                                              0xd000+1                    0xded
 
-jriibios.hex: jriibios.asm
-	cpm $(ASM) $<
+SBIIBIOS.HEX: SBIIBIOS.ASM
+	cpm $(ASM) $< \
+		&& mv sbiibios.hex $@
 
-jriibios.com jrconfig.com: jriibios.hex
-	sed '/^:000000/q' $< > jriibios.tmp \
-		&& objcopy -I ihex -O binary jriibios.tmp jriibios.tm2 \
-		&& head -c 1536 jriibios.tm2 > jriibios.com \
-		&& tail -c +4353 jriibios.tm2 > jrconfig.com \
-		&& truncate --size=128 jrconfig.com \
-		&& rm -f jriibios.tmp jriibios.tm2
+SBIIBIOS.COM sbconfig.com: SBIIBIOS.HEX
+	sed '/^:000000/q' $< > SBIIBIOS.TMP \
+		&& objcopy -I ihex -O binary SBIIBIOS.TMP SBIIBIOS.TM2 \
+		&& head -c 1536 SBIIBIOS.TM2 > SBIIBIOS.COM \
+		&& tail -c +4353 SBIIBIOS.TM2 > sbconfig.com \
+		&& truncate --size=128 sbconfig.com \
+		&& rm -f SBIIBIOS.TMP SBIIBIOS.TM2
 
-qdiibios.hex: qdiibios.asm
-	cpm $(ASM) $<
+QDIIBIOS.HEX: QDIIBIOS.ASM
+	cpm $(ASM) $< \
+		&& mv qdiibios.hex $@
 
-qdiibios.com qdconfig.com: qdiibios.hex
-	sed '/^:000000/q' $< > qdiibios.tmp \
-		&& objcopy -I ihex -O binary qdiibios.tmp qdiibios.tm2 \
-		&& head -c 1536 qdiibios.tm2 > qdiibios.com \
-		&& tail -c +4353 qdiibios.tm2 > qdconfig.com \
+QDIIBIOS.COM qdconfig.com: QDIIBIOS.HEX
+	sed '/^:000000/q' $< > QDIIBIOS.TMP \
+		&& objcopy -I ihex -O binary QDIIBIOS.TMP QDIIBIOS.TM2 \
+		&& head -c 1536 QDIIBIOS.TM2 > QDIIBIOS.COM \
+		&& tail -c +4353 QDIIBIOS.TM2 > qdconfig.com \
 		&& truncate --size=128 qdconfig.com \
-		&& rm -f qdiibios.tmp qdiibios.tm2
+		&& rm -f QDIIBIOS.TMP QDIIBIOS.TM2
 
-sbiibios.rel: sbiibios.asm
+pviibios.rel: pviibios.asm
 	cpm $(RMAC) $<
 
-sbiibios.com: sbiibios.rel
+pviibios.com: pviibios.rel
 	cpm $(LINK) $<[L0000,Pe400] \
-		&& mv $@ sbiibios.tmp && tail -c +58369 sbiibios.tmp | head -c 1837 > $@ \
+		&& mv $@ pviibios.tmp && tail -c +58369 pviibios.tmp | head -c 1837 > $@ \
 		&& truncate --size=2816 $@ \
-		&& rm -f sbiibios.tmp
+		&& rm -f pviibios.tmp
 
-$(BUILD_DIR)/jriicpm.com: sysgen.com flopboot.com os2ccp.com os3bdos.com jriibios.com sbiibios.com jrconfig.com | $(BUILD_DIR)
+$(BUILD_DIR)/SBIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com SBIIBIOS.COM pviibios.com sbconfig.com | $(BUILD_DIR)
 	cat $^ > $@
 
-$(BUILD_DIR)/qdiicpm.com: sysgen.com flopboot.com os2ccp.com os3bdos.com qdiibios.com sbiibios.com qdconfig.com | $(BUILD_DIR)
+$(BUILD_DIR)/QDIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com QDIIBIOS.COM pviibios.com qdconfig.com | $(BUILD_DIR)
 	cat $^ > $@
 
 clean:
@@ -89,10 +91,10 @@ clean:
 	rm -f flopboot.hex flopboot.prn flopboot.sym flopboot.com flopboot.tmp
 	rm -f os2ccp.rel   os2ccp.prn   os2ccp.sym   os2ccp.com   os2ccp.tmp
 	rm -f os3bdos.rel  os3bdos.prn  os3bdos.sym  os3bdos.com  os3bdos.tmp
-	rm -f jriibios.hex jriibios.prn jriibios.sym jriibios.com jriibios.tmp jriibios.tm2 jrconfig.com 
-	rm -f qdiibios.hex qdiibios.prn qdiibios.sym qdiibios.com qdiibios.tmp qdiibios.tm2 qdconfig.com 
-	rm -f sbiibios.rel sbiibios.prn sbiibios.sym sbiibios.com sbiibios.tmp
-	rm -f $(BUILD_DIR)/jriicpm.com $(BUILD_DIR)/qdiicpm.com
+	rm -f SBIIBIOS.HEX sbiibios.prn sbiibios.sym SBIIBIOS.COM SBIIBIOS.TMP SBIIBIOS.TM2 sbconfig.com 
+	rm -f QDIIBIOS.HEX qdiibios.prn qdiibios.sym QDIIBIOS.COM QDIIBIOS.TMP QDIIBIOS.TM2 qdconfig.com 
+	rm -f pviibios.rel pviibios.prn pviibios.sym pviibios.com pviibios.tmp
+	rm -f $(BUILD_DIR)/sbiicpm.com $(BUILD_DIR)/qdiicpm.com
 	rm -f 'xxprog.$$$$$$' 'xxabs.$$$$$$'
 	rm -f *~
 
