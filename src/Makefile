@@ -4,7 +4,7 @@ LINK := LINK
 
 BUILD_DIR := ../build
 
-all: $(BUILD_DIR)/jriicpm.com
+all: $(BUILD_DIR)/jriicpm.com $(BUILD_DIR)/qdiicpm.com
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -50,13 +50,24 @@ os3bdos.com: os3bdos.rel
 jriibios.hex: jriibios.asm
 	cpm $(ASM) $<
 
-jriibios.com config.com: jriibios.hex
+jriibios.com jrconfig.com: jriibios.hex
 	sed '/^:000000/q' $< > jriibios.tmp \
 		&& objcopy -I ihex -O binary jriibios.tmp jriibios.tm2 \
 		&& head -c 1536 jriibios.tm2 > jriibios.com \
-		&& tail -c +4353 jriibios.tm2 > config.com \
-		&& truncate --size=128 config.com \
+		&& tail -c +4353 jriibios.tm2 > jrconfig.com \
+		&& truncate --size=128 jrconfig.com \
 		&& rm -f jriibios.tmp jriibios.tm2
+
+qdiibios.hex: qdiibios.asm
+	cpm $(ASM) $<
+
+qdiibios.com qdconfig.com: qdiibios.hex
+	sed '/^:000000/q' $< > qdiibios.tmp \
+		&& objcopy -I ihex -O binary qdiibios.tmp qdiibios.tm2 \
+		&& head -c 1536 qdiibios.tm2 > qdiibios.com \
+		&& tail -c +4353 qdiibios.tm2 > qdconfig.com \
+		&& truncate --size=128 qdconfig.com \
+		&& rm -f qdiibios.tmp qdiibios.tm2
 
 sbiibios.rel: sbiibios.asm
 	cpm $(RMAC) $<
@@ -67,7 +78,10 @@ sbiibios.com: sbiibios.rel
 		&& truncate --size=2816 $@ \
 		&& rm -f sbiibios.tmp
 
-$(BUILD_DIR)/jriicpm.com: sysgen.com flopboot.com os2ccp.com os3bdos.com jriibios.com sbiibios.com config.com | $(BUILD_DIR)
+$(BUILD_DIR)/jriicpm.com: sysgen.com flopboot.com os2ccp.com os3bdos.com jriibios.com sbiibios.com jrconfig.com | $(BUILD_DIR)
+	cat $^ > $@
+
+$(BUILD_DIR)/qdiicpm.com: sysgen.com flopboot.com os2ccp.com os3bdos.com qdiibios.com sbiibios.com qdconfig.com | $(BUILD_DIR)
 	cat $^ > $@
 
 clean:
@@ -75,9 +89,10 @@ clean:
 	rm -f flopboot.hex flopboot.prn flopboot.sym flopboot.com flopboot.tmp
 	rm -f os2ccp.rel   os2ccp.prn   os2ccp.sym   os2ccp.com   os2ccp.tmp
 	rm -f os3bdos.rel  os3bdos.prn  os3bdos.sym  os3bdos.com  os3bdos.tmp
-	rm -f jriibios.hex jriibios.prn jriibios.sym jriibios.com jriibios.tmp jriibios.tm2 config.com 
+	rm -f jriibios.hex jriibios.prn jriibios.sym jriibios.com jriibios.tmp jriibios.tm2 jrconfig.com 
+	rm -f qdiibios.hex qdiibios.prn qdiibios.sym qdiibios.com qdiibios.tmp qdiibios.tm2 qdconfig.com 
 	rm -f sbiibios.rel sbiibios.prn sbiibios.sym sbiibios.com sbiibios.tmp
-	rm -f $(BUILD_DIR)/jriicpm.com
+	rm -f $(BUILD_DIR)/jriicpm.com $(BUILD_DIR)/qdiicpm.com
 	rm -f 'xxprog.$$$$$$' 'xxabs.$$$$$$'
 	rm -f *~
 
