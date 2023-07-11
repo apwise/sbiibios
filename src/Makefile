@@ -4,7 +4,7 @@ LINK := LINK
 
 BUILD_DIR := ../build
 
-all: $(BUILD_DIR)/SBIICPM.COM $(BUILD_DIR)/QDIICPM.COM
+all: $(BUILD_DIR)/SBIICPM.COM $(BUILD_DIR)/QDIICPM.COM $(BUILD_DIR)/SDIICPM.COM
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -71,6 +71,18 @@ QDIIBIOS.COM qdconfig.com: QDIIBIOS.HEX
 		&& truncate --size=128 qdconfig.com \
 		&& rm -f QDIIBIOS.TMP QDIIBIOS.TM2
 
+SDIIBIOS.HEX: SDIIBIOS.ASM
+	cpm $(ASM) $< \
+		&& mv sdiibios.hex $@
+
+SDIIBIOS.COM sdconfig.com: SDIIBIOS.HEX
+	sed '/^:000000/q' $< > SDIIBIOS.TMP \
+		&& objcopy -I ihex -O binary SDIIBIOS.TMP SDIIBIOS.TM2 \
+		&& head -c 1536 SDIIBIOS.TM2 > SDIIBIOS.COM \
+		&& tail -c +4353 SDIIBIOS.TM2 > sdconfig.com \
+		&& truncate --size=128 sdconfig.com \
+		&& rm -f SDIIBIOS.TMP SDIIBIOS.TM2
+
 pviibios.rel: pviibios.asm
 	cpm $(RMAC) $<
 
@@ -86,6 +98,9 @@ $(BUILD_DIR)/SBIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com SBIIBIO
 $(BUILD_DIR)/QDIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com QDIIBIOS.COM pviibios.com qdconfig.com | $(BUILD_DIR)
 	cat $^ > $@
 
+$(BUILD_DIR)/SDIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com SDIIBIOS.COM pviibios.com sdconfig.com | $(BUILD_DIR)
+	cat $^ > $@
+
 clean:
 	rm -f sysgen.rel sysgen.prn sysgen.sym sysgen.com sysgen.tmp
 	rm -f flopboot.hex flopboot.prn flopboot.sym flopboot.com flopboot.tmp
@@ -93,8 +108,9 @@ clean:
 	rm -f os3bdos.rel  os3bdos.prn  os3bdos.sym  os3bdos.com  os3bdos.tmp
 	rm -f SBIIBIOS.HEX sbiibios.prn sbiibios.sym SBIIBIOS.COM SBIIBIOS.TMP SBIIBIOS.TM2 sbconfig.com 
 	rm -f QDIIBIOS.HEX qdiibios.prn qdiibios.sym QDIIBIOS.COM QDIIBIOS.TMP QDIIBIOS.TM2 qdconfig.com 
+	rm -f SDIIBIOS.HEX sdiibios.prn sdiibios.sym SDIIBIOS.COM SDIIBIOS.TMP SDIIBIOS.TM2 sdconfig.com 
 	rm -f pviibios.rel pviibios.prn pviibios.sym pviibios.com pviibios.tmp
-	rm -f $(BUILD_DIR)/sbiicpm.com $(BUILD_DIR)/qdiicpm.com
+	rm -f $(BUILD_DIR)/SBIICPM.COM $(BUILD_DIR)/QDIICPM.COM $(BUILD_DIR)/QDIICPM.COM
 	rm -f 'xxprog.$$$$$$' 'xxabs.$$$$$$'
 	rm -f *~
 

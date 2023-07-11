@@ -7,9 +7,9 @@ STACK   EQU     5fffh + OFFSET  ; Stack when loading
 STACK1  EQU     5fdfh + OFFSET  ; Stack during interrupt
 STACK2  EQU     5fbfh + OFFSET  ; Stack during conout
 STACK3  EQU     5f9fh + OFFSET  ; Stack during disk routines
-DIRBUF  EQU     5e80h + OFFSET  ; 128 bytes for disk directory
-KBDBUF  EQU     5f00h + OFFSET  ; 128 byte keyboard buffer
 KBDBFE  EQU     5f80h + OFFSET  ; End of keyboard buffer (bottom of STACK3)
+KBDBUF  EQU     5f00h + OFFSET  ; 128 byte keyboard buffer
+DIRBUF  EQU     5e80h + OFFSET  ; 128 bytes for disk directory
 ;
 CONFIG  EQU     5b00h + OFFSET  ; Configuration table read from disk
 BAUD    EQU     CONFIG          ; For main and aux ports
