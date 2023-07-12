@@ -93,9 +93,9 @@ vtopsl: ds      2               ; Video top select
 vidchr: ds      1               ; Character being sent to screen
 vrwenp: ds      2               ; Pointer into vrwenc
 ; Copy of vrwen used (in interrupt routine) during video frame
-vrwenc: ds      CPR + 1
+vrwenc: ds      LPF + 1
 ; Video row enables - 1 byte per row of video
-vrwen:  ds      CPR + 1
+vrwen:  ds      LPF + 1
 belctr: db      0               ; Bell counter
 krptct: db      0               ; Keyboard repeat counter
 vchset: ds      1               ; Select alternate character set

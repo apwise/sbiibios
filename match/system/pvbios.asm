@@ -117,9 +117,9 @@ krptct: db      37h             ; Keyboard repeat counter
         endif
         if      NOT xmatch
 ; Copy of vrwen used (in interrupt routine) during video frame
-vrwenc: ds      CPR + 1
+vrwenc: ds      LPF + 1
 ; Video row enables - 1 byte per row of video
-vrwen:  ds      CPR + 1
+vrwen:  ds      LPF + 1
 belctr: db      0               ; Bell counter
 krptct: db      0               ; Keyboard repeat counter
         endif
