@@ -261,10 +261,10 @@ ENDTRK:
         DAD     D       ;+SPT*SECSIZ
         SHLD    DMADDR  ;READY FOR NEXT TRACK
         JMP     RWTRK   ;FOR ANOTHER TRACK
-ENDRW:  lhld    1
-        lxi     d, 21
-        dad     d
-        pchl
+ENDRW:  lhld    1       ;Pointer to WBOOTE
+        lxi     d, 21   ;7 'jmp' instructions later
+        dad     d       ;is entry point to HOME
+        pchl            ;flushes any pending write
         ds      10
 ;
 ;ENDRW:  ;END OF READ OR WRITE, RETURN TO CALLER

@@ -72,10 +72,13 @@ system.dsk: flopboot.com os2ccp.com os3bdos.com SBIIBIOS.COM junk1 pvbios.com ju
 	cat $^ > $@
 
 system.hex: system.dsk
-	od -tx1z -A x system.dsk > system.hex
+	od -tx1z -A x $< > $@
 
-diffs.txt: system.hex
-	sdiff -w 160 originals/SBIIBOOT.hex system.hex > $@
+SBIIBOOT.hex: originals/SBIIBOOT.dsk
+	od -tx1z -A x $< > $@
+
+diffs.txt: system.hex SBIIBOOT.hex
+	sdiff -w 160 SBIIBOOT.hex system.hex > $@
 
 clean:
 	rm -f flopboot.hex flopboot.prn flopboot.sym flopboot.com flopboot.tmp
@@ -83,7 +86,7 @@ clean:
 	rm -f os3bdos.rel  os3bdos.prn  os3bdos.sym  os3bdos.com  os3bdos.tmp
 	rm -f SBIIBIOS.HEX sbiibios.prn sbiibios.sym SBIIBIOS.COM SBIIBIOS.TMP SBIIBIOS.TM2 sbconfig.com 
 	rm -f pvbios.rel pvbios.prn pvbios.sym pvbios.com pvbios.tmp
-	rm -f system.dsk   system.hex   diffs.txt
+	rm -f system.dsk   system.hex   SBIIBOOT.hex diffs.txt
 	rm -f junk1 junk2 junk3
 	rm -f 'xxprog.$$$$$$' 'xxabs.$$$$$$'
 	rm -f *~
