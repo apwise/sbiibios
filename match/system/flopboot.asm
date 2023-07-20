@@ -31,7 +31,7 @@ EVEN0:  CALL    RDNEXT
         INR     E               ; Step sector number
         INR     E               ; by two
         MOV     A,E
-        CPI     12             ; Beyond the required number?
+        CPI     12              ; Beyond the required number?
         JNZ     EVEN0           ; Loop over sectors
         SHLD    TMPADR          ; Store address temporarily
 ;
@@ -42,7 +42,7 @@ ODD0:   CALL    RDNEXT
         INR     E               ; Step sector number
         INR     E               ; by two
         MOV     A,E
-        CPI     11             ; Beyond the required number?
+        CPI     11              ; Beyond the required number?
         JNZ     ODD0            ; Loop over sectors
 ; 
 ; Track 1, sectors  1, 3, 5, 7, 9
