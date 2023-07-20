@@ -460,7 +460,7 @@ BTSTRP  EQU     0c780h          ; Bootstrap loader address
 ;;;
         ORG     0c000h
         jmp     c006h   ;0400 c3 06 c0         jmp c006h
-        jmp     dread   ;0403 c3 87 c2         jmp c287h
+DREAD:  jmp     dread1  ;0403 c3 87 c2         jmp c287h
         di              ;0406 f3               di
         lxi     sp, STACK       ;0407 31 ff f3         lxi sp, f3ffh
         mvi     a, 82h  ;040a 3e 82            mvi a, 82h
@@ -575,7 +575,7 @@ lp6:    lxi     b, 0000h        ; Restore command, Disk 0
 L001:   lxi     h, BTSTRP       ; Bootstrap loader address
         lxi     d, 0001h        ; Track 0, Sector 1
         lxi     b, 0100h        ; Read command, Disk 0
-        call    dread           ; Read the sector
+        call    dread1          ; Read the sector
         jmp     BTSTRP          ; Jump to the bootstrap loader
 ;;;
 intrp:  push    h       ;0501 e5               push h
@@ -812,7 +812,7 @@ L002:   call    c136h   ;0518 cd 36 c1
         sta     c305h   ;0683 32 05 c3         sta c305h
         ret             ;0686 c9               ret
 ;;;
-dread:  push    h       ;0687 e5               push h
+dread1: push    h       ;0687 e5               push h
         call    fparam   ;0688 cd 98 c2         call c298h
         call    fpwres   ;068b cd dd c2         call c2ddh
         pop     h       ;068e e1               pop h

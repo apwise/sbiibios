@@ -1,1 +1,1 @@
-../match/system/originals/flopboot.asm
+../match/system/flopboot.asm
