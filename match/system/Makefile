@@ -48,13 +48,13 @@ junk1: originals/SBIIBOOT.dsk
 	tail -c +6936 $< | head -c 361 > $@ 
 #              0x1b17+1          0x1c80 - 0x1b17
 
-pvbios.rel: pvbios.asm
+pviibios.rel: pviibios.asm
 	cpm $(RMAC) $<
 
-pvbios.com: pvbios.rel
+pviibios.com: pviibios.rel
 	cpm $(LINK) $<[L0000,Pe400] \
-		&& mv $@ pvbios.tmp && tail -c +58369 pvbios.tmp | head -c 1837 > $@ \
-		&& rm -f pvbios.tmp
+		&& mv $@ pviibios.tmp && tail -c +58369 pviibios.tmp | head -c 1837 > $@ \
+		&& rm -f pviibios.tmp
 
 junk2: originals/SBIIBOOT.dsk
 	tail -c +9134 $< | head -c 979 > $@
@@ -68,7 +68,7 @@ junk3: originals/SBIIBOOT.dsk
 
 # mv os2ccp.com os2ccp.tmp && tail -c +51200 os2ccp.tmp | head -c -2034 > os2ccp.com
 
-system.dsk: flopboot.com os2ccp.com os3bdos.com SBIIBIOS.COM junk1 pvbios.com junk2 sbconfig.com junk3
+system.dsk: flopboot.com os2ccp.com os3bdos.com SBIIBIOS.COM junk1 pviibios.com junk2 sbconfig.com junk3
 	cat $^ > $@
 
 system.hex: system.dsk
@@ -85,7 +85,7 @@ clean:
 	rm -f os2ccp.rel   os2ccp.prn   os2ccp.sym   os2ccp.com   os2ccp.tmp
 	rm -f os3bdos.rel  os3bdos.prn  os3bdos.sym  os3bdos.com  os3bdos.tmp
 	rm -f SBIIBIOS.HEX sbiibios.prn sbiibios.sym SBIIBIOS.COM SBIIBIOS.TMP SBIIBIOS.TM2 sbconfig.com 
-	rm -f pvbios.rel pvbios.prn pvbios.sym pvbios.com pvbios.tmp
+	rm -f pviibios.rel pviibios.prn pviibios.sym pviibios.com pviibios.tmp
 	rm -f system.dsk   system.hex   SBIIBOOT.hex diffs.txt
 	rm -f junk1 junk2 junk3
 	rm -f 'xxprog.$$$$$$' 'xxabs.$$$$$$'

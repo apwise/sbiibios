@@ -8,9 +8,9 @@ STACK   EQU     5fffh + OFFSET  ; Stack when loading
 STACK1  EQU     5fdfh + OFFSET  ; Stack during interrupt
 STACK2  EQU     5fbfh + OFFSET  ; Stack during conout
 STACK3  EQU     5f9fh + OFFSET  ; Stack during disk routines
-DIRBUF  EQU     5e80h + OFFSET  ; 128 bytes for disk directory
-KBDBUF  EQU     5f00h + OFFSET  ; 128 byte keyboard buffer
 KBDBFE  EQU     5f80h + OFFSET  ; End of keyboard buffer (bottom of STACK3)
+KBDBUF  EQU     5f00h + OFFSET  ; 128 byte keyboard buffer
+DIRBUF  EQU     5e80h + OFFSET  ; 128 bytes for disk directory
 ;
 CONFIG  EQU     5b00h + OFFSET  ; Configuration table read from disk
 BAUD    EQU     CONFIG          ; For main and aux ports
@@ -32,7 +32,7 @@ PVBIOS: EQU     5000H+OFFSET    ; Start of this private BIOS module
 ; Locations in CPU-2 RAM concerned with floppy disks
 ; 
 FPYPRM  EQU     8802h           ; 4-byte parameter block
-FPYCMD  EQU     8807h           ; Command byte (FF = "go")
+FPYGO   EQU     8807h           ; Command byte (FF = "go")
 FPYBUF  EQU     8808h           ; 512-byte sector buffer
 FPYSTS  EQU     8a0bh           ; Returned status byte
 PHYSEC  EQU     0200h           ; Physical sector size (512 bytes)
@@ -127,7 +127,7 @@ vchset: ds      1               ; Select alternate character set
 escst1: ds      1               ; Escape state-machine state 1
         if      xmatch
 escst2: db      32h             ; Escape state-machine state 2
-vtrans: db      41h             ; Transparanet mode - display control characters
+vtrans: db      41h             ; Transparent mode - display control characters
 scncol: db      31h             ; Screen column
 scnrow: db      32h             ; Screen row
 vlinum: db      43h             ; Video line number in interrupt routine
@@ -135,7 +135,7 @@ INTSTK: dw      3134h           ; Save SP during interrupts
         endif
         if      NOT xmatch
 escst2: ds      1               ; Escape state-machine state 2
-vtrans: ds      1               ; Transparanet mode - display control characters
+vtrans: ds      1               ; Transparent mode - display control characters
 scncol: ds      1               ; Screen column
 scnrow: ds      1               ; Screen row
 vlinum: ds      1               ; Video line number in interrupt routine
@@ -239,32 +239,33 @@ inisyn: BIT     7,A             ; Single character SYNC?
 inisy1: out     MNSTAT          ; Program sync char1 or char2
         ret
 ;
-INTRP:  SSPD    INTSTK
-        lxi     sp, STACK1
-        push    h
+INTRP:  SSPD    INTSTK          ; Save stack pointer
+        lxi     sp, STACK1      ; Switch to interrupt stack
+        push    h               ; Save registers
         push    d
         push    b
         push    psw
         in      PPIB
         ani     04h             ; Vertical sync?
-        JRZ     ihsync
+        JRZ     ihsync          ; No, deal with horizontal sync
 ; Vertical sync
         call    ivsync
         lxi     h, vlinum
         mvi     m, 00h          ; Clear line number
-intrpx: in      INTRST
-        pop     psw
+intrpx: in      INTRST          ; Acknowledge interrupt
+        pop     psw             ; Restore registers
         pop     b
         pop     d
         pop     h
-        LSPD    INTSTK
+        LSPD    INTSTK          ; Restore stack pointer
         ei
         RETI
 ;
+; Horizontal sync
 ihsync: call    vseten          ; Set blanking for the next row
         lxi     h, vlinum
         inr     m               ; Step line number
-        JR      intrpx
+        JR      intrpx          ; Exit interrupt routine
 ;
 ivsync: call    vidpts          ; Send video pointers to controller
 ;
@@ -273,7 +274,7 @@ ivsync: call    vidpts          ; Send video pointers to controller
         lxi     b, LPF          ; 24 bytes (but there are 25 allocated?)
         LDIR
 ;
-        lxi     h, vrwenc       ; Start of (copy of) blanking array
+        lxi     h, vrwenc       ; Start of (copy of) enable array
         shld    vrwenp          ; Initialize pointer for the frame
         call    vseten          ; Set blanking for the first row
         call    rtcdpy          ; Display time on screen
@@ -318,7 +319,7 @@ vidpts: lhld    timpos          ; Take copy of time display position
         xchg
         mov     m, a            ; Set row start (for first row)
         mvi     a, TOPSEL
-        mov     m, a            ; which is also the top of scrren
+        mov     m, a            ; which is also the top of screen
         mvi     a, 00h          ; PPIC[0] = 0 - addr/data bus back to normal
         out     PPICW
         ret
@@ -594,7 +595,7 @@ vdspl1: mov     m, a            ; Put character in video RAM
         ori     20h             ; PRTA[5] = 1 - Address DRAM
         out     PPIA
         ei                      ; Enable interrupts
-        call    stpcrs
+        call    stpcrs          ; Step cursor
         ret
 ;
 ;  Address vrwen (row enables) array
@@ -602,7 +603,7 @@ varwen: lxi     h, vrwen        ; Start of vrwen
         mvi     d, 00h
         lda     vidrow
         mov     e, a            ; DE = which row
-        dad     d               ; HL now points at correct row blank flag
+        dad     d               ; HL now points at correct row enable flag
         ret
 ;
 scroll: lda     scrlck          ; Scroll-lock ?
@@ -617,7 +618,7 @@ scrol1: lda     vlinum          ; Is this dead code?
         jp      scrol1          ; Result is unused
 ; 
 scrol2: di                      ; No interrupts while updating
-        lhld    vtopsl          ; Get pointer top of sceen
+        lhld    vtopsl          ; Get pointer to top of sceen
         lxi     d, CPR          ; Add row length
         dad     d
         shld    vtopsl          ; Update top of screen
@@ -659,14 +660,14 @@ vradr0: SLAR    E               ; Shift DE right one place
         JRNZ    vradrl          ; Loop over bits
         LDED    vtopsl          ; Start of top row
         dad     d               ; Add in (row * 80)
-        ret                             ;
+        ret
 ;
 ; Actually clear the row in video RAM and clear
 ; the vrwen flag for the row so the row is displayed
 ;
 vclrow: call    vraddr          ; Address the RAM for this row
         mvi     b, CPR          ; Number to clear
-        call    vidclr            ; Clear the row
+        call    vidclr          ; Clear the row
         call    varwen          ; Address the vrwen array
         mvi     m, 0ffh         ; and set to display the row
         ret
@@ -803,7 +804,7 @@ stpcrs: lhld    vcursr          ; Step cursor
         JRNZ    stpcr2          ; No, still in the same line
         mvi     l, 00h          ; Clear column
         mov     a, h            ; Get row
-        cpi     23              ;   last row?
+        cpi     LPF-1           ;   last row?
         JRNZ    stpcr1          ; No, go increment row
         push    h
         call    scroll
@@ -1068,11 +1069,13 @@ vclre1: inx     h               ; Step vrwen pointer
 ; Disk routine
 ; 
 ; Command in b:
-;   0,4 - Restore
-;   1   - Read
-;   2   - Write with    RAW verification
-;   5   - format
-;   6   - Write without RAW verification
+;   0 - Restore
+;   1 - Read
+;   2 - Write with RAW verification
+;   3 - (also write with RAW)
+;   4 - Format
+;   5 - Select drive 
+;   6 - Write without RAW verification
 ;
 ; c  = disk   number
 ; d  = track  number
@@ -1084,11 +1087,11 @@ disk1:  shld    dskptr          ; Save data pointer (but this never used)
         lxi     sp, STACK3
         mov     a, b
         cpi     00h             ; Restore
-        JRZ     drestr
-        cpi     04h             ; Restore
-        JRZ     drestr
-        cpi     05h             ; Format
-        JRZ     dfrmt
+        JRZ     dnodat
+        cpi     04h             ; Format
+        JRZ     dnodat
+        cpi     05h             ; Select
+        JRZ     dselct
         cpi     01h             ; Read
         JRZ     dread
 ; Here for write
@@ -1097,7 +1100,7 @@ disk1:  shld    dskptr          ; Save data pointer (but this never used)
         call    hst2fp          ; Copy data to CPU2
         pop     b
         pop     d
-drestr: call    fparam          ; Send parameters
+dnodat: call    fparam          ; Send parameters
         call    fpwres          ; Wait for result
         call    fpstat          ; Get status to return
 dexit:  LSPD    DSKSTK
@@ -1111,12 +1114,12 @@ dread:  push    h               ; Save data pointer (why is dskptr not used?)
         call    fpstat          ; Get status to return
         JR      dexit
 ;
-dfrmt:  call    fparam          ; Send parameters
+dselct: call    fparam          ; Send parameters
         mvi     b, 80h
-dfrmt1: push    h               ; Waste time for command to start
+dslct1: push    h               ; Waste time for command to start
         pop     h
         dcr     b
-        JRNZ    dfrmt1
+        JRNZ    dslct1
         xra     a               ; Clear return status
         JR      dexit
 ;
@@ -1142,7 +1145,7 @@ fparam: call    busopn          ; Send params
         cma
         mov     m, a            ; ~track number
         mvi     a, 0ffh
-        sta     FPYCMD
+        sta     FPYGO
         call    buscls
         ret
 ;
