@@ -39,18 +39,6 @@ PHYSEC  EQU     0200h           ; Physical sector size (512 bytes)
 ;
 ; Table of equates--I/O devices
 ;
-RTCSEC  EQU     32h             ; Seconds register in RTC
-AUXDAT  EQU     40h             ; Aux port data
-AUXST   EQU     41h             ; Aux port status
-INTRST  EQU     48h             ; Reset interrupt latch
-KBCHAR  EQU     50h             ; Keyboard character
-MNDAT   EQU     58h             ; Main port data
-MNSTAT  EQU     59h             ; Main port status
-BDGEN   EQU     60h             ; Baud rate generator
-PPIA    EQU     68h             ; 8255 port a
-PPIB    EQU     69h             ; 8255 port b
-PPIC    EQU     6ah             ; 8255 port c
-PPICW   EQU     6bh             ; 8255 control port
 TENTHS  EQU     31h             ; RTC tenths digit (r/o)
 USECS   EQU     32h             ; RTC units of seconds (r/o)
 TSECS   EQU     33h             ; RTC tens of seconds (r/o)
@@ -65,6 +53,17 @@ UMONTH  EQU     3bh             ; RTC units of months (r/w)
 TMONTH  EQU     3ch             ; RTC tens of months (r/w)
 YEARS   EQU     3dh             ; RTC leap year setting (w/o)
 START   EQU     3eh             ; RTC start/stop port (w/o)
+AUXDAT  EQU     40h             ; Aux port data
+AUXST   EQU     41h             ; Aux port status
+INTRST  EQU     48h             ; Reset interrupt latch
+KBCHAR  EQU     50h             ; Keyboard character
+MNDAT   EQU     58h             ; Main port data
+MNSTAT  EQU     59h             ; Main port status
+BDGEN   EQU     60h             ; Baud rate generator
+PPIA    EQU     68h             ; 8255 port a
+PPIB    EQU     69h             ; 8255 port b
+PPIC    EQU     6ah             ; 8255 port c
+PPICW   EQU     6bh             ; 8255 control port
 TOPSEL  EQU     02h             ; CRTC top of page register
 ROWSTR  EQU     01h             ; CRTC row start register
 CURSOR  EQU     03h             ; CRTC cursor register
@@ -433,7 +432,7 @@ rtcdpy: lda     TIMENB          ; Is time display enabled?
         lhld    timpsc          ; First row address?
         lxi     d, 0009h        ; 9 characters in time display
         dad     d
-        mvi     c, RTCSEC
+        mvi     c, USECS        ; RTC units of seconds
         mvi     e, 02h          ; Digits between ':' chars
         mvi     b, 06h          ; Total digits
 rtclp:  mov     a, h            ; Force address into video RAM area
@@ -638,7 +637,7 @@ scrol2: di                      ; No interrupts while updating
         rnz                     ; Yes - all done
         mvi     b, CPR          ; Line length
         lhld    vtopsl          ; Point at top of screen
-        call    vidclr            ; Clear the top row
+        call    vidclr          ; Clear the top row
         lxi     h, vrwen
         mvi     m, 0ffh         ; and enable its display
         ret
