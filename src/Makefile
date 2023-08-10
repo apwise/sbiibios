@@ -89,16 +89,25 @@ pviibios.rel: pviibios.asm
 pviibios.com: pviibios.rel
 	cpm $(LINK) $<[L0000,Pe400] \
 		&& mv $@ pviibios.tmp && tail -c +58369 pviibios.tmp | head -c 1837 > $@ \
-		&& truncate --size=2816 $@ \
+		&& truncate --size=2688 $@ \
 		&& rm -f pviibios.tmp
 
-$(BUILD_DIR)/SBIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com SBIIBIOS.COM pviibios.com sbconfig.com | $(BUILD_DIR)
+wmstrt.rel: wmstrt.asm
+	cpm $(RMAC) $<
+
+wmstrt.com: wmstrt.rel
+	cpm $(LINK) $<[L0000] \
+		&& mv $@ wmstrt.tmp && tail -c +61057 wmstrt.tmp | head -c 114 > $@ \
+		&& truncate --size=128 $@ \
+		&& rm -f wmstrt.tmp
+
+$(BUILD_DIR)/SBIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com SBIIBIOS.COM pviibios.com wmstrt.com sbconfig.com | $(BUILD_DIR)
 	cat $^ > $@
 
-$(BUILD_DIR)/QDIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com QDIIBIOS.COM pviibios.com qdconfig.com | $(BUILD_DIR)
+$(BUILD_DIR)/QDIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com QDIIBIOS.COM pviibios.com wmstrt.com qdconfig.com | $(BUILD_DIR)
 	cat $^ > $@
 
-$(BUILD_DIR)/SDIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com SDIIBIOS.COM pviibios.com sdconfig.com | $(BUILD_DIR)
+$(BUILD_DIR)/SDIICPM.COM: sysgen.com flopboot.com os2ccp.com os3bdos.com SDIIBIOS.COM pviibios.com wmstrt.com sdconfig.com | $(BUILD_DIR)
 	cat $^ > $@
 
 clean:
@@ -106,10 +115,11 @@ clean:
 	rm -f flopboot.hex flopboot.prn flopboot.sym flopboot.com flopboot.tmp
 	rm -f os2ccp.rel   os2ccp.prn   os2ccp.sym   os2ccp.com   os2ccp.tmp
 	rm -f os3bdos.rel  os3bdos.prn  os3bdos.sym  os3bdos.com  os3bdos.tmp
-	rm -f SBIIBIOS.HEX sbiibios.prn sbiibios.sym SBIIBIOS.COM SBIIBIOS.TMP SBIIBIOS.TM2 sbconfig.com 
-	rm -f QDIIBIOS.HEX qdiibios.prn qdiibios.sym QDIIBIOS.COM QDIIBIOS.TMP QDIIBIOS.TM2 qdconfig.com 
-	rm -f SDIIBIOS.HEX sdiibios.prn sdiibios.sym SDIIBIOS.COM SDIIBIOS.TMP SDIIBIOS.TM2 sdconfig.com 
+	rm -f SBIIBIOS.HEX sbiibios.prn sbiibios.sym SBIIBIOS.COM SBIIBIOS.TMP SBIIBIOS.TM2 sbconfig.com
+	rm -f QDIIBIOS.HEX qdiibios.prn qdiibios.sym QDIIBIOS.COM QDIIBIOS.TMP QDIIBIOS.TM2 qdconfig.com
+	rm -f SDIIBIOS.HEX sdiibios.prn sdiibios.sym SDIIBIOS.COM SDIIBIOS.TMP SDIIBIOS.TM2 sdconfig.com
 	rm -f pviibios.rel pviibios.prn pviibios.sym pviibios.com pviibios.tmp
+	rm -f wmstrt.rel   wmstrt.prn   wmstrt.sym   wmstrt.com   wmstrt.tmp
 	rm -f $(BUILD_DIR)/SBIICPM.COM $(BUILD_DIR)/QDIICPM.COM $(BUILD_DIR)/QDIICPM.COM
 	rm -f 'xxprog.$$$$$$' 'xxabs.$$$$$$'
 	rm -f *~
