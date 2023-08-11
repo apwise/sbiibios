@@ -3,6 +3,7 @@ MATCH_DIR := ./match
 SYSTEM_DIR := $(MATCH_DIR)/system
 SYSGEN_DIR := $(MATCH_DIR)/sysgen
 BOOTROM_DIR := $(MATCH_DIR)/bootrom
+DOCS_DIR := ./docs
 BUILD_DIR := ./build
 
 all clean:
@@ -10,6 +11,7 @@ all clean:
 	$(MAKE) -C $(SYSTEM_DIR) $(MAKECMDGOALS)
 	$(MAKE) -C $(SYSGEN_DIR) $(MAKECMDGOALS)
 	$(MAKE) -C $(BOOTROM_DIR) $(MAKECMDGOALS)
+	$(MAKE) -C $(DOCS_DIR) $(MAKECMDGOALS)
 
 clean: local_clean
 
