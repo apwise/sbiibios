@@ -4,6 +4,8 @@ SYSTEM_DIR := $(MATCH_DIR)/system
 SYSGEN_DIR := $(MATCH_DIR)/sysgen
 BOOTROM_DIR := $(MATCH_DIR)/bootrom
 DOCS_DIR := ./docs
+SBTOOLS_DIR := ./sb_tools
+READROM_DIR := $(SBTOOLS_DIR)/readrom
 BUILD_DIR := ./build
 
 all clean:
@@ -12,6 +14,7 @@ all clean:
 	$(MAKE) -C $(SYSGEN_DIR) $(MAKECMDGOALS)
 	$(MAKE) -C $(BOOTROM_DIR) $(MAKECMDGOALS)
 	$(MAKE) -C $(DOCS_DIR) $(MAKECMDGOALS)
+	$(MAKE) -C $(READROM_DIR) $(MAKECMDGOALS)
 
 clean: local_clean
 
