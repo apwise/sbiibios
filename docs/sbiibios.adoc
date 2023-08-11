@@ -1,0 +1,176 @@
+= Superbrain II BIOS
+Adrian Wise <apw@adrianwise.co.uk>
+0.1, 29 July, 2023: Initial version
+:toc:
+:icons: font
+:quick-uri: http://asciidoctor.org/docs/asciidoc-syntax-quick-reference/
+
+== Ports
+
+=== CPU-1 Ports
+
+[cols="1,1,2,6"]
+|===
+2+^h| I/O Address .2+.>h| Chip .2+.>h| Description
+  ^h| Start ^h| End
+  ^m|   30  ^m|  3F  | MM58174 | RTC
+  ^m|   40  ^m|  41  | 8251    | Auxiliary serial port
+  ^m|   48  ^m|  48  | -       | Reset interrupt latch
+  ^m|   50  ^m|  50  | KR3600  | Keyboard character
+  ^m|   58  ^m|  59  | 8251    | Main serial port
+  ^m|   60  ^m|  60  | BR1941  | Baud rate generator
+  ^m|   68  ^m|  69  | 8255    | Parallel port system control
+2+^h|  Data value  2+|
+  ^m|   1   ^m|  3   | DP8350  | CRTC video controller
+|===
+
+==== Parallel port system control
+
+[%header,cols="1,1,1,7"]
+|===
+^| PPIA ^| 68 ^| out | Video control
+.3+^.^| 0 3+| Whole screen alternate character set.
+           ^|  0  2+| Normal character set
+           ^|  1  2+| Alternate character set
+^.^| 1 3.2+.^| Associated with addressing the character ROM, but essentially
+            useless according to the 1982/10 issue of Superletter.
+^.^| 2 
+^.^| 3 3.2+.^| Unconnected (see schematic).
+^.^| 4 
+.3+^.^| 5 3+| Mapping of attribute RAM (4800h to 4FFFh)
+           ^|  0  2+| Attribute DRAM mapped
+           ^|  1  2+| Normal RAM mapped 
+.3+^.^| 6 3+| Video frequency
+           ^|  0  2+| 50Hz
+           ^|  1  2+| 60Hz 
+.3+^.^| 7 3+| Whole screen reverse video
+           ^|  0  2+| Normal - white on black background
+           ^|  1  2+| Reverse - black on white background
+|===
+
+[%header,cols="1,1,1,7"]
+|===
+^| PPIB ^| 69 ^| in | Keyboard, interrupts, CPU-2, etc.
+.3+^.^| 0 3+| New key down?
+           ^|  0  2+| No new key
+           ^|  1  2+| New key down
+.3+^.^| 1 3+| Any key still down?
+           ^|  0  2+| None
+           ^|  1  2+| Key still down
+.3+^.^| 2 3+| Video interrupt type
+           ^|  0  2+| Horizontal
+           ^|  1  2+| Vertical
+   ^.^| 3 3+.^| Unconnected (see schematic).
+.3+^.^| 4 3+| Main port ring indicator
+           ^|  0  2+| Not ringing
+           ^|  1  2+| Ringing
+.3+^.^| 5 3+| CPU-2 floppy disk command busy
+           ^|  0  2+| Not busy
+           ^|  1  2+| Busy
+.3+^.^| 6 3+| Caps-lock
+           ^|  0  2+| Caps-lock engaged
+           ^|  1  2+| Caps-lock not engaged
+.3+^.^| 7 3+| CPU-2 bus acknowledge
+           ^|  0  2+| Bus available - OK to map RAM (or ROM)
+           ^|  1  2+| Bus not (yet?) available
+|===
+
+[%header,cols="1,1,1,7"]
+|===
+^| PPIC ^| 6A ^| out | CRTC, CPU-2 control, bell, and keyboard
+.3+^.^| 0 3+| Address/Data bus swap for CRTC
+           ^|  0  2+| Normal
+           ^|  1  2+| Swapped - write to CRTC address registers
+.3+^.^| 1 3+| Video row blanking
+           ^|  0  2+| Display row
+           ^|  1  2+| Blank row
+.3+^.^| 2 3+| Map boot ROM (0000h to 07FFh)
+           ^|  0  2+| Normal DRAM mapped
+           ^|  1  2+| Boot ROM mapped
+.3+^.^| 3 3+| CPU-2 reset
+           ^|  0  2+| CPU-2 allowed to run
+           ^|  1  2+| CPU-2 held in reset
+.3+^.^| 4 3+| CPU-2's RAM mapping on CPU-1 (8800h to 8FFFh)
+           ^|  0  2+| CPU-2's RAM mapped
+           ^|  1  2+| Normal DRAM mapped
+.3+^.^| 5 3+| Request CPU-2 bus
+           ^|  0  2+| Request the bus
+           ^|  1  2+| Normal state (bus not requested)
+.3+^.^| 6 3+| Bell
+           ^|  0  2+| Bell on
+           ^|  1  2+| Bell off
+.3+^.^| 7 3+| Keybord acknowledge
+           ^|  0  2+| Pulse low to acknowledge
+           ^|  1  2+| Normal state
+|===
+
+
+=== CPU-2 Ports
+
+[cols="1,1,2,6"]
+|===
+2+^h| I/O Address .2+.>h| Chip .2+.>h| Description
+  ^h| Start ^h| End
+  ^m|   08  ^m|  0B  | FDC1791 | Floppy disk controller
+  ^m|   10  ^m|  10  | -       | Control port
+|===
+
+==== Control port
+
+[%header,cols="1,1,1,7"]
+|===
+^| Control ^| 10 ^| out | Busy, disk select, side select
+.3+^.^| 0 3+| Busy bit (visible on CPU-1 as PPIB[5])
+           ^|  0  2+| Not busy
+           ^|  1  2+| Busy
+.3+^.^| 1 3+| Drive A select
+           ^|  0  2+| Not selected
+           ^|  1  2+| Selected
+.3+^.^| 2 3+| Drive B select
+           ^|  0  2+| Not selected
+           ^|  1  2+| Selected
+.3+^.^| 3 3+| Drive C select
+           ^|  0  2+| Not selected
+           ^|  1  2+| Selected
+.3+^.^| 4 3+| Drive D select
+           ^|  0  2+| Not selected
+           ^|  1  2+| Selected
+.3+^.^| 5 3+| Side select
+           ^|  0  2+| First side selected
+           ^|  1  2+| Second side selected
+|===
+
+== Memory map
+
+[%header,cols="2,2,2,3,17"]
+|===
+.>| Start .>| End  >.>| Size ^| Symbol or (file) .>| Description
+| 0000  | 07FF >| 2048 ^| -          | Boot ROM mapped here when PPIC[2] = 1
+| 4800  | 4FFF >| 1024 ^| -          | Video attribute RAM mapped here when PPA[5] = 0
+| C000  | C3FF >| 1024 ^| -          | Boot loader code copied here from ROM
+| C780  | C7E5 >|  102 ^| (flopboot) | Bootstrap loader
+| C7E6  | C7FF >|   26 ^| -          | (unused)
+| C800  | CFF1 >| 2034 ^| (os2ccp)   | CP/M Console Command Processor
+| CFF2  | CFFF >|   14 ^| -          | (unused)
+| D000  | DDED >| 3566 ^| (os3bdos)  | CP/M Basic Disc Operating System
+| DDEE  | DDFF >|   18 ^| -          | (unused)
+| DE00  | E296 >| 1175 ^| (SBIIBIOS) | Published Superbrain II Junior Basic Input/Output System
+| E297  | E3FF >|  361 ^| -          | (unused)
+| E400  | EB9C >| 1949 ^| (pviibios) | Superbrain II Private Basic Input/Output System module
+| EB9D  | EE7F >|  739 ^| -          | (unused)
+| EE80  | EEF1 >|  114 ^| (wmstrt)   | Warm start loader
+| EEF2  | EEFF >|   14 ^| -          | (unused)
+| EF00  | EF1F >|   32 ^| CONFIG     | Configuration values loaded from last logical sector on track 1
+| EF20  | EF7F >|   96 ^| -          | Spare bytes in the CONFIG sector
+| EF80  | F27F >|  768 ^| -          | (unused)
+| F280  | F2FF >|  128 ^| DIRBUF     | Disk directory buffer
+| F300  | F37F >|  128 ^| KBDBUF     | Keyboard type-ahead buffer
+| F380  | F39F >|   32 ^| STACK3     | Stack during disk routines
+| F3A0  | F3BF >|   32 ^| STACK2     | Stack during conout
+| F3C0  | F3DF >|   32 ^| STACK1     | Stack during interrupt
+| F3E0  | F3FF >|   32 ^| STACK      | Stack during boot process
+| F400  | F5FF >|  512 ^| -          | (unused)
+| F600  | F7FF >|  512 ^| HSTBUF     | Disk host buffer
+| F800  | FFFF >| 2048 ^| -          | Video RAM
+|===
+
