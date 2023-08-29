@@ -115,8 +115,9 @@ In `match/bootrom/originals`:
 
 It copies chunks of 128 bytes (one logical CP/M sector) from the bootrom
 into upper memory from where it is written to a disk file. The copy from
-to bootrom occurs with interrupts disabled because the ROM has to be
-mapped in at location zero (so that the interrupt vector isn't available).
+the bootrom occurs with interrupts disabled because the ROM has to be
+mapped in at location zero (so that the interrupt vector isn't
+available...).
 
 ## Source code
 
@@ -139,9 +140,9 @@ The source files are:
 
 In truth, I don't know the exact `sgnon` message for either the Jr
 (`SBIIBIOS.ASM`) or SD (`SDIIBIOS.ASM`) variants (since I've only ever
-seen a genuine boot disk for a QD). Similarly, the disk parameter blocks
-for Jr and SD are computed by me, and I might have them wrong. Please
-let me know if you have an original boot disk for these variants. 
+seen a genuine boot disk image for a QD). Similarly, the disk parameter
+blocks for Jr and SD are computed by me, and I might have them wrong.
+Please let me know if you have an original boot disk for these variants. 
 
 The `Makefile` builds the following (in the `build` directory):
 
@@ -153,6 +154,6 @@ The `Makefile` builds the following (in the `build` directory):
 
 ## Documentation
 
-The `doc` directory contains a short [asciidoctor](https://asciidoctor.org/)
+The `docs` directory contains a short [asciidoctor](https://asciidoctor.org/)
 document containing technical information on I/O ports and the overall
 memory map that has been learned while working on this project.
