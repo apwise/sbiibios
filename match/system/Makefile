@@ -2,8 +2,9 @@ ASM  := ASM
 RMAC := RMAC
 LINK := LINK
 
+CLEAN_FILES := clean_pviibios.asm clean_SBIIBIOS.ASM
 
-all: system.dsk diffs.txt
+all: system.dsk diffs.txt $(CLEAN_FILES)
 
 flopboot.hex: flopboot.asm
 	cpm $(ASM) $<
@@ -56,6 +57,9 @@ pviibios.com: pviibios.rel
 		&& mv $@ pviibios.tmp && tail -c +58369 pviibios.tmp | head -c 1837 > $@ \
 		&& rm -f pviibios.tmp
 
+clean_%: %
+	sed -f ../clean_src.sed $< > $@
+
 junk2: originals/SBIIBOOT.dsk
 	tail -c +9134 $< | head -c 851 > $@
 #              0x23ad+1          0x2700 - 0x23ad
@@ -103,6 +107,7 @@ clean:
 	rm -f system.dsk   system.hex   SBIIBOOT.hex diffs.txt
 	rm -f junk1 junk2 junk3 junk4
 	rm -f 'xxprog.$$$$$$' 'xxabs.$$$$$$'
+	rm -f $(CLEAN_FILES)
 	rm -f *~
 
 .PHONY:	clean

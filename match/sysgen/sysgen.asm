@@ -492,6 +492,6 @@ START:
         LDA     FCB+1   ;BLANK IF NO FILE
         CPI     ' '
         JZ      GETSYS  ;SKIP TO GET SYSTEM MESSAGE IF BLANK
-        jmp     STRT
+        JMP     STRT
 ;
         END

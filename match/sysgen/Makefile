@@ -2,8 +2,9 @@
 RMAC := RMAC
 LINK := LINK
 
+CLEAN_FILES := clean_sysgen.asm
 
-all:	diffs.txt
+all:	diffs.txt $(CLEAN_FILES)
 
 sysgen.rel: sysgen.asm
 	cpm $(RMAC) $<
@@ -13,6 +14,9 @@ sysgen.com: sysgen.rel
 
 sysgen.odx: sysgen.com
 	tail -c +257 $< | head -c 996 | od -tx1z -Ax > $@
+
+clean_%: %
+	sed -f ../clean_src.sed $< > $@
 
 cs30cpm.odx: originals/cs30cpm.com
 	cp $< cs30cpm.tmp
@@ -26,6 +30,7 @@ diffs.txt: sysgen.odx cs30cpm.odx
 clean:
 	rm -f sysgen.hex sysgen.prn sysgen.rel sysgen.sym sysgen.com
 	rm -f sysgen.odx cs30cpm.odx diffs.txt
+	rm -f $(CLEAN_FILES)
 	rm -f *~
 
 .PHONY: clean

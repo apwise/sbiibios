@@ -1,5 +1,5 @@
 xmatch  equ     1
-;        .TITLE  'SUPERBRAIN II BIOS FOR JUNIOR VER 1.1, CPM VER 2.2 (JRIIBIOS.ASM) 4/21/82'
+;        .TITLE  'SUPERBRAIN II BIOS FOR JUNIOR VER 1.1, CPM VER 2.2 (SBIIBIOS.ASM) 4/21/82'
 ;
 ;
 ;*******  DISKS 'A' AND 'B' MUST BE 512 BYTES/SECTOR  ************
@@ -874,10 +874,10 @@ sgnon:
 ;
         if      xmatch
         DB      'SUPERBRAIN II QUAD DENSITY DOS VER 1.1, FOR CP/M 2.2     ',0AH,0DH,80H
-        endc
+        endif
         if      NOT xmatch
         DB      'SUPERBRAIN II JUNIOR DOS VER 1.1, FOR CP/M 2.2           ',0AH,0DH,80H
-        endc
+        endif
 ;
 ;
 ;
