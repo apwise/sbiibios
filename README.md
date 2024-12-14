@@ -152,6 +152,25 @@ The `Makefile` builds the following (in the `build` directory):
 | `QDIICPM.COM`  | Installer for Superbrain II QD (Quad Density - double-sided 35-track) |
 | `SDIICPM.COM`  | Installer for Superbrain II SD (Super Density - double-sided 80-track) |
 
+## Character generator EPROM
+
+`sbiichar/sbiichar.bin` is the contents of the standard character generator
+EPROM in my SuperBrain II Jr.
+
+![Rendering of the standard Superbrain II character set](sbiichar/sbiichar.png "Standard Superbrain II character set")
+
+Each character has seven pixels horizontally by ten vertically and occupies sixteen
+consecutive bytes in the EPROM. The first byte (address offset 0) represents the top
+line of the character, continuing on successive lines until the tenth byte (address
+offset 9) which is the bottom line of the character. The remaining six bytes are ignored.
+
+Each byte represents one horizontal line. The least significant bit is the left-most
+pixel, and the most-significant bit of each byte is ignored.
+
+The standard character generator EPROM holds the glyphs for character codes 0 to 127.
+A second (non-standard) character generator EPROM may be inserted to represent
+character codes 128 to 255.
+
 ## Documentation
 
 The `docs` directory contains a short [asciidoctor](https://asciidoctor.org/)
