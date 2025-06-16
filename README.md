@@ -43,7 +43,8 @@ from:
 | -------------- | ----------------------------------------------------- |
 | `flopboot.asm` | The bootstrap loader (in the first sector of the first track) from the Maslin archive [qdhdbios.td0](http://www.retroarchive.org/maslin/disks/intertec/qdhdbios.td0) |
 | `OS2CCP.ASM`   | CCP source code from [Digital Research Source Code](http://www.retroarchive.org/cpm/archive/unofficial/download/cpm2-plm.zip) |
-| `OS3BDOS.ASM`  | BDOS source code from [Digital Research Source Code](http://www.retroarchive.org/cpm/archive/unofficial/download/cpm2-plm.zip) || `qdiibios.asm` | Present, as source code, on the same bootable floppy from which the system tracks were extracted (as `SBIIBOOT.dsk`) - contributed to `SBIIBIOS.ASM` |
+| `OS3BDOS.ASM`  | BDOS source code from [Digital Research Source Code](http://www.retroarchive.org/cpm/archive/unofficial/download/cpm2-plm.zip) |
+| `qdiibios.asm` | Present, as source code, on the same bootable floppy from which the system tracks were extracted (as `SBIIBOOT.dsk`) - contributed to `SBIIBIOS.ASM` |
 | `cse30bs.asm`  | Compustar BIOS from the Don Maslin archive [csr30enh.td0](http://www.retroarchive.org/maslin/disks/intertec/csr30enh.td0) - contributed to `SBIIBIOS.ASM` |
 | `qd31bios.asm` | Superbrain (one) BIOS from Dave Dunfield's [image archive](http://dunfield.classiccmp.org/img/) - contributed to `SBIIBIOS.ASM` |
 | `SBIIBOOT.dsk` | The first two tracks from a bootable floppy disk supplied by a fellow hobbyist |
