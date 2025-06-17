@@ -179,3 +179,4 @@ character codes 128 to 255.
 The [docs](https://github.com/apwise/sbiibios/tree/main/docs) directory contains a short [asciidoctor](https://asciidoctor.org/)
 document containing technical information on I/O ports and the overall
 memory map that has been learned while working on this project.
+See [docs/sbiibios.adoc](https://github.com/apwise/sbiibios/tree/main/docs/sbiibios.adoc).
