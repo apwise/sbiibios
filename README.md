@@ -14,17 +14,18 @@ from source code.
 
 ## Match
 
-The code in the `match` directory is source code (much of it disassembled)
+The code in the [match](https://github.com/apwise/sbiibios/tree/main/match) directory is source code (much of it disassembled)
 that matches (exact binary match) references. It is divided into three
 directories:
 
- * system - the boot tracks of a bootable floppy
- * sysgen - the O/S installer program (that writes the system tracks)
- * bootrom - the boot ROM of my machine
+ * [system](https://github.com/apwise/sbiibios/tree/main/match/system) - the boot tracks of a bootable floppy
+ * [sysgen](https://github.com/apwise/sbiibios/tree/main/match/sysgen) - the O/S installer program (that writes the system tracks)
+ * [bootrom](https://github.com/apwise/sbiibios/tree/main/match/bootrom) - the boot ROM of my machine
 
 ### System
 
-The code in `match/system` is the source code (a mix of disassembled
+The code in [match/system](https://github.com/apwise/sbiibios/tree/main/match/system)
+is the source code (a mix of disassembled
 code and original source code) that matches the system tracks from a
 bootable floppy disk. The code here builds (see the `Makefile`) to
 produce `system.dsk` which is compared against the first two tracks
@@ -33,7 +34,8 @@ of a bootable floppy which a fellow hobbyist kindly sent to me.
 
 As always, my work here builds on the work of others that have
 preserved software or disassembled parts of the system before me.
-The `match/system/originals` directory contains the files that I
+The [match/system/originals](https://github.com/apwise/sbiibios/tree/main/match/system/originals)
+directory contains the files that I
 started with. The following notes what they are and where I got them
 from:
 
@@ -51,7 +53,7 @@ from:
 
 #### Source code for binary match
 
-The source files that can be built to match the system tracks are in `match/system`. Several of the files have conditional assembly under the symbol
+The source files that can be built to match the system tracks are in [match/system](https://github.com/apwise/sbiibios/tree/main/match/system). Several of the files have conditional assembly under the symbol
 `xmatch` to get an exact binary match. In particular this affects variables
 that ought to be declared with a `ds` pseudo-op, but need to use a `dw`
 or `db` pseudo-op with whatever random data happened to be lying around in
@@ -80,7 +82,7 @@ is also possible to save a (suitably named copy of) `SYSGEN.COM` with the disk i
 drive, this pre-loaded image can be written to disks. This then becomes
 an O/S installer program.
 
-This area (`match/sysgen`) takes the digital research source code for a
+This area ([match/sysgen](https://github.com/apwise/sbiibios/tree/main/match/sysgen)) takes the digital research source code for a
 standard `SYSGEN` and patches it inline with a disassembly of an
 Intertec-supplied O/S install program (actually for a Compustar). The
 main changes from the DRI code are the necessary changes to reflect the
@@ -91,7 +93,7 @@ bug-fix between version 1.4 and version 2.0 of `SYSGEN`.
 
 #### References
 
-In `match/sysgen/originals`:
+In [match/sysgen/originals](https://github.com/apwise/sbiibios/tree/main/match/system/originals):
 
 | Filename       | Description                                           |
 | -------------- | ----------------------------------------------------- |
@@ -100,11 +102,11 @@ In `match/sysgen/originals`:
 
 ### Bootrom
 
-`match/bootrom` is a disassembly of bootrom found in my SuperBrain II Jr.
+[match/bootrom](https://github.com/apwise/sbiibios/tree/main/match/bootrom) is a disassembly of bootrom found in my SuperBrain II Jr.
 
 #### References
 
-In `match/bootrom/originals`:
+In [match/bootrom/originals](https://github.com/apwise/sbiibios/tree/main/match/bootrom/originals):
 
 | Filename       | Description                                           |
 | -------------- | ----------------------------------------------------- |
@@ -112,7 +114,7 @@ In `match/bootrom/originals`:
 
 ## Readrom
 
-`sb_tools/readrom` is a tiny utility to read the bootrom of a Superbrain.
+[sb_tools/readrom](https://github.com/apwise/sbiibios/tree/main/sb_tools/readrom) is a tiny utility to read the bootrom of a Superbrain.
 
 It copies chunks of 128 bytes (one logical CP/M sector) from the bootrom
 into upper memory from where it is written to a disk file. The copy from
@@ -122,7 +124,7 @@ available...).
 
 ## Source code
 
-Clean source code to build the operating system is in the `src` directory.
+Clean source code to build the operating system is in the [src](https://github.com/apwise/sbiibios/tree/main/src) directory.
 This has all the `xmatch` conditional compilation removed.
 
 The source files are:
@@ -155,7 +157,7 @@ The `Makefile` builds the following (in the `build` directory):
 
 ## Character generator EPROM
 
-`sbiichar/sbiichar.bin` is the contents of the standard character generator
+[sbiichar/sbiichar.bin](https://github.com/apwise/sbiibios/tree/main/sbiichar/sbiichar.bin) is the contents of the standard character generator
 EPROM in my SuperBrain II Jr.
 
 ![Rendering of the standard Superbrain II character set](sbiichar/sbiichar.png "Standard Superbrain II character set")
@@ -174,6 +176,6 @@ character codes 128 to 255.
 
 ## Documentation
 
-The `docs` directory contains a short [asciidoctor](https://asciidoctor.org/)
+The [docs](https://github.com/apwise/sbiibios/tree/main/docs) directory contains a short [asciidoctor](https://asciidoctor.org/)
 document containing technical information on I/O ports and the overall
 memory map that has been learned while working on this project.
