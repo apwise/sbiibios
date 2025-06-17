@@ -12,6 +12,8 @@ Superbrain II. However, it's grown a little to encompass also
 disassembling the boot ROM and being able to build the O/S installer
 from source code.
 
+The [sbiibios](https://github.com/apwise/sbiibios/tree/main) repository.
+
 ## Match
 
 The code in the [match](https://github.com/apwise/sbiibios/tree/main/match) directory is source code (much of it disassembled)
